@@ -7,7 +7,6 @@ import dev.pierrot.commands.core.CommandResult
 import dev.pierrot.embed
 import dev.pierrot.getOrCreateMusicManager
 import dev.pierrot.tempReply
-import net.dv8tion.jda.api.EmbedBuilder
 import java.awt.Color
 
 class Loop : BasePrefixCommand() {
