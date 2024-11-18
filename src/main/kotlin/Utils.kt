@@ -14,6 +14,7 @@ import net.dv8tion.jda.api.entities.channel.unions.MessageChannelUnion
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.awt.Color
 import java.util.*
 
 fun getLogger(name: String): Logger {
@@ -28,7 +29,7 @@ fun getOrCreateMusicManager(guildId: String, metadata: MessageChannelUnion? = nu
     synchronized(JDAListener::class.java) {
         val guildMusicManager = App.ServiceLocator.musicManagerStrategy.getMusicManager(guildId)
 
-        if (guildMusicManager.metadata?.id !== metadata?.id) {
+        if (metadata != null && guildMusicManager.metadata?.id !== metadata.id) {
             guildMusicManager.metadata = metadata
         }
         return guildMusicManager
@@ -68,26 +69,27 @@ fun String.toCapital(): String {
 fun isNotSameVoice(user1: GuildVoiceState?, user2: GuildVoiceState?, message: Message): Boolean {
     if (user1 == null || user2 == null) return true
 
-    user1.channel ?: run {
-        message.replyEmbeds(
-            EmbedBuilder()
-                .setAuthor("❌ | Bạn cần vào voice để thực hiện lệnh này!")
-                .build()
-        ).queue()
+    if (user1.channel == null) {
+        replyError(message, "❌ | Bạn cần vào voice để thực hiện lệnh này!")
         return true
     }
 
-    if (user2.channel != null && user1.channel?.idLong != user2.channel?.idLong) {
-        message.replyEmbeds(
-            EmbedBuilder()
-                .setAuthor("❌ | Bạn không có ở cùng voice với tui~~")
-                .build()
-        ).queue()
+    if (user2.channel?.id != null && user1.channel?.id != user2.channel?.id) {
+        replyError(message, "❌ | Bạn không có ở cùng voice với tui~~")
         return true
     }
 
     return false
 }
+
+private fun replyError(message: Message, errorMessage: String) {
+    message.replyEmbeds(
+        EmbedBuilder()
+            .setAuthor(errorMessage)
+            .build()
+    ).queue()
+}
+
 
 fun tempReply(context: Message, message: Any, delayMillis: Long = 20000) {
     val sentMessage: Message = when (message) {
@@ -99,6 +101,11 @@ fun tempReply(context: Message, message: Any, delayMillis: Long = 20000) {
     setTimeout({
         sentMessage.delete().queue()
     }, delayMillis)
+}
+
+fun embed(): EmbedBuilder {
+    return EmbedBuilder()
+        .setColor(Color.pink)
 }
 
 enum class LoopMode {

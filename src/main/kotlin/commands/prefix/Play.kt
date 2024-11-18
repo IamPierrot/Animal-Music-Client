@@ -22,6 +22,7 @@ class Play : BasePrefixCommand() {
             .withCooldown(Duration.ofSeconds(5))
             .withUsage( "${config.app.prefix} $name <tên bài hát | link youtube/spotify>")
             .withCategory("music")
+            .withRequireVoiceChannel()
             .build()
 
     override fun executeCommand(context: CommandContext): CommandResult {

@@ -12,6 +12,7 @@ class GuildMusicManager(private val guildId: String, var metadata: MessageChanne
 
     private val lavalinkClient = App.ServiceLocator.lavalinkClient
     val scheduler = TrackScheduler(this)
+
     fun getCurrentTrack(): Track? {
         val result = AtomicReference<Track?>()
         getPlayer().let { lavalinkPlayer ->
@@ -20,6 +21,33 @@ class GuildMusicManager(private val guildId: String, var metadata: MessageChanne
             )
         }
         return result.get()
+    }
+
+    @Synchronized
+    fun isPlaying(): Boolean {
+        return try {
+            getCurrentTrack() != null
+        } catch (error: Throwable) {
+            false
+        }
+    }
+
+    fun skip() {
+        scheduler.skipTrack()
+    }
+
+    fun back() {
+        scheduler.backTrack()
+    }
+
+    fun stop() {
+        scheduler.queue.clear()
+
+        getPlayer().ifPresent { player: LavalinkPlayer ->
+            player.setPaused(false)
+                .setTrack(null)
+                .subscribe()
+        }
     }
 
     internal fun getLink(): Optional<Link> {

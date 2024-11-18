@@ -1,18 +1,20 @@
 package dev.pierrot.commands.config
 
+
 import dev.pierrot.config
 import net.dv8tion.jda.api.Permission
 import java.time.Duration
 
 // Command Configuration (Builder Pattern)
-class CommandConfig private constructor(
+data class CommandConfig(
     val prefix: String = config.app.prefix,
     val cooldown: Duration = Duration.ofSeconds(2),
     val usage: String = "",
     val deleteCommandMessage: Boolean = false,
     val requireBotPermissions: List<Permission> = emptyList(),
     val requireUserPermissions: List<Permission> = emptyList(),
-    val category: String = "Misc"
+    val category: String = "Misc",
+    val voiceChannel: Boolean = false
 ) {
     class Builder {
         private var prefix: String = config.app.prefix
@@ -22,6 +24,7 @@ class CommandConfig private constructor(
         private var requireBotPermissions: List<Permission> = emptyList()
         private var requireUserPermissions: List<Permission> = emptyList()
         private var category: String = "Misc"
+        private var voiceChannel: Boolean = false
 
         fun withPrefix(prefix: String) = apply { this.prefix = prefix }
         fun withCooldown(cooldown: Duration) = apply { this.cooldown = cooldown }
@@ -30,6 +33,7 @@ class CommandConfig private constructor(
         fun withBotPermissions(permissions: List<Permission>) = apply { this.requireBotPermissions = permissions }
         fun withUserPermission(permissions: List<Permission>) = apply { this.requireUserPermissions = permissions }
         fun withCategory(category: String) = apply { this.category = category }
+        fun withRequireVoiceChannel() = apply { this.voiceChannel = true }
 
         fun build() = CommandConfig(
             prefix,
@@ -38,7 +42,8 @@ class CommandConfig private constructor(
             deleteCommandMessage,
             requireBotPermissions,
             requireUserPermissions,
-            category
+            category,
+            voiceChannel
         )
     }
 }

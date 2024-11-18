@@ -5,6 +5,7 @@ import dev.arbjerg.lavalink.client.event.TrackEndEvent
 import dev.arbjerg.lavalink.client.event.TrackStartEvent
 import dev.arbjerg.lavalink.client.player.Track
 import dev.pierrot.LoopMode
+import dev.pierrot.embed
 import dev.pierrot.getLogger
 import dev.pierrot.setTimeout
 import net.dv8tion.jda.api.EmbedBuilder
@@ -26,11 +27,12 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
     private var loopMode: LoopMode = LoopMode.NONE
     private var currentTrack: Track? = null
     private var goingBack = false
+    private var previousTrack: Track? = null
 
-    ////////////////// EVENTS
     fun onTrackStart(event: TrackStartEvent) {
         val track = event.track
         currentTrack = track
+        previousTrack = currentTrack
 
         logger.info("Track started: {}", track.info)
 
@@ -57,20 +59,34 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
 
     fun onTrackEnd(event: TrackEndEvent) {
         val endReason = event.endReason
-        if (!goingBack && currentTrack != null) {
-            history.push(currentTrack)
-        } else {
-            history.push(event.track.makeClone())
+
+        if (!goingBack) {
+            currentTrack?.let { history.push(it) }
         }
+        goingBack = false
 
         if (endReason.mayStartNext) {
-            if (loopMode == LoopMode.TRACK) startTrack(event.track.makeClone())
-            else nextTrack()
+            when (loopMode) {
+                LoopMode.TRACK -> startTrack(event.track.makeClone())
+                LoopMode.QUEUE -> handleQueueLoop(event.track)
+                LoopMode.NONE -> nextTrack()
+            }
         }
     }
-    ////////////////////////////////////////
 
-    ///////////////////////// Queue navigation
+    private fun handleQueueLoop(currentTrack: Track) {
+        if (queue.isEmpty()) {
+            if (history.isEmpty()) {
+                startTrack(currentTrack.makeClone())
+                return
+            }
+
+            queue.addAll(history.reversed())
+            history.clear()
+        }
+        nextTrack()
+    }
+
     fun enqueue(track: Track) {
         val lavalinkPlayer = guildMusicManager.getPlayer().orElse(null)
         if (lavalinkPlayer?.track == null) {
@@ -82,7 +98,6 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
 
     fun enqueuePlaylist(tracks: List<Track>) {
         queue.addAll(tracks)
-
         if (guildMusicManager.getPlayer().isPresent) {
             startTrack(queue.poll())
         } else {
@@ -90,9 +105,6 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
         }
     }
 
-    //////////////////////////////////////////////
-
-    //////////////////////////////// UTILS
     @Synchronized
     fun skipTrack() {
         goingBack = false
@@ -104,7 +116,7 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
         if (history.isNotEmpty()) {
             goingBack = true
             val previousTrack = history.pop()
-            queue.offer(currentTrack)
+            currentTrack?.let { queue.offer(it) }
             startTrack(previousTrack)
         } else {
             guildMusicManager.metadata?.sendMessageEmbeds(
@@ -129,57 +141,50 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
     @Synchronized
     fun removeTrack(index: Int) {
         val temp = ArrayList(queue)
-        temp.removeAt(index)
-        queue.clear()
-        queue.addAll(temp)
-    }
-    ///////////////////////////////////////////
-
-    /////////////////////////// Track handle
-    private fun nextTrack() {
-        when {
-            loopMode == LoopMode.TRACK && currentTrack != null -> startTrack(currentTrack?.makeClone())
-            loopMode == LoopMode.QUEUE && queue.isNotEmpty() -> {
-                queue.addAll(history)
-                startTrack(queue.poll())
-            }
-
-            else -> {
-                val nextTrack = queue.poll()
-                startTrack(nextTrack)
-                if (nextTrack == null) {
-                    guildMusicManager.metadata?.sendMessageEmbeds(
-                        EmbedBuilder()
-                            .setAuthor("Không còn bài hát nào trong danh sách!")
-                            .setColor(Color.RED)
-                            .build()
-                    )?.queue()
-                }
-            }
+        if (index in temp.indices) {
+            temp.removeAt(index)
+            queue.clear()
+            queue.addAll(temp)
         }
     }
-    ////////////////////////////////////////////
 
-    ////////////////////////////////////// LOOP MODE
-    @Synchronized
-    fun getLoopMode(): Int {
-        return loopMode.ordinal
+    private fun nextTrack() {
+        val nextTrack = queue.poll()
+
+        if (nextTrack != null) {
+            startTrack(nextTrack)
+        } else {
+            if (loopMode == LoopMode.TRACK) {
+                startTrack(currentTrack?.makeClone())
+                return
+            }
+
+            currentTrack = null
+            guildMusicManager.metadata?.sendMessageEmbeds(
+                embed()
+                    .setAuthor("Không còn bài hát nào trong danh sách!")
+                    .setColor(Color.RED)
+                    .build()
+            )?.queue()
+            startTrack(null)
+        }
     }
+
+    @Synchronized
+    fun getLoopMode(): Int = loopMode.ordinal
 
     @Synchronized
     fun setLoopMode(loopMode: LoopMode) {
         this.loopMode = loopMode
     }
-    ///////////////////////////////////////
 
-    /////////////////////////////////////// HELPERS
     private fun trackEmbed(track: Track): MessageEmbed {
         val trackInfo = track.info
         val lengthInMillis = trackInfo.length
         val minutes = (lengthInMillis / 1000) / 60
         val seconds = (lengthInMillis / 1000) % 60
 
-        return EmbedBuilder()
+        return embed()
             .setAuthor("MENU ĐIỀU KHIỂN", null, trackInfo.artworkUrl)
             .setDescription(
                 """
@@ -190,8 +195,6 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
             )
             .setFooter("💖 Âm nhạc đi trước tình yêu theo sau", guildMusicManager.metadata?.jda?.selfUser?.avatarUrl)
             .setThumbnail(trackInfo.artworkUrl)
-            .setColor(Color.PINK)
             .build()
     }
-    ////////////////////////////////////////////////////
 }

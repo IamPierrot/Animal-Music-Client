@@ -2,6 +2,7 @@ package dev.pierrot.commands.core
 
 import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.config
+import dev.pierrot.isNotSameVoice
 import dev.pierrot.tempReply
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
@@ -27,6 +28,23 @@ object MessageHandler {
             handleUnknownCommand(event, isMentionPrefix)
             return
         }
+        if (command.commandConfig.voiceChannel) {
+            val memberVoiceState = event.member?.voiceState
+            val selfVoiceState = event.guild.selfMember.voiceState
+
+            if (memberVoiceState?.channel == null) {
+                tempReply(event.message,
+                    EmbedBuilder()
+                        .setAuthor("❌ | Bạn cần vào voice để thực hiện lệnh này!")
+                        .build()
+                )
+                return
+            }
+            if (isNotSameVoice(memberVoiceState, selfVoiceState, event.message)) {
+                return
+            }
+        }
+
 
         val context = CommandContext(
             event = event,
@@ -69,10 +87,16 @@ object MessageHandler {
             is CommandResult.Error -> sendErrorEmbed(context.event.message, result.message)
             is CommandResult.CooldownActive -> {
                 val timeStamp = "<t:${System.currentTimeMillis() / 1000 + result.remainingTime.seconds}:R>"
-                sendErrorEmbed(context.event.message, "Hãy đợi $timeStamp để sử dụng lệnh.", result.remainingTime.toMillis())
+                sendErrorEmbed(
+                    context.event.message,
+                    "Hãy đợi $timeStamp để sử dụng lệnh.",
+                    result.remainingTime.toMillis()
+                )
             }
+
             CommandResult.InsufficientPermissions ->
                 sendErrorEmbed(context.event.message, "Bạn không đủ quyền dùng lệnh này!")
+
             CommandResult.InvalidArguments ->
                 sendErrorEmbed(
                     context.event.message,

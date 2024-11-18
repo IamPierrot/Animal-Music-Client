@@ -14,6 +14,7 @@ interface PrefixCommand {
     val description: String
     val aliases: Array<String>
     fun execute(context: CommandContext): CommandResult
+    val commandConfig: CommandConfig
 }
 
 // Command Results

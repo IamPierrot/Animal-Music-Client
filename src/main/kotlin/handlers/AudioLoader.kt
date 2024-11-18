@@ -2,7 +2,7 @@ package dev.pierrot.handlers
 
 import dev.arbjerg.lavalink.client.AbstractAudioLoadResultHandler
 import dev.arbjerg.lavalink.client.player.*
-import net.dv8tion.jda.api.EmbedBuilder
+import dev.pierrot.embed
 import net.dv8tion.jda.api.entities.MessageEmbed
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import java.awt.Color
@@ -48,7 +48,7 @@ class AudioLoader(private val event: MessageReceivedEvent, private val guildMusi
     private fun trackEmbed(track: Track): MessageEmbed {
         val trackInfo = track.info
 
-        return EmbedBuilder()
+        return embed()
             .setAuthor("THÊM VÀO HÀNG CHỜ", null, trackInfo.artworkUrl)
             .setDescription("Đã thêm [${trackInfo.title}](${trackInfo.uri}) vào hàng chờ!")
             .setFooter("💖 Âm nhạc đi trước tình yêu theo sau", event.jda.selfUser.avatarUrl)
@@ -58,7 +58,7 @@ class AudioLoader(private val event: MessageReceivedEvent, private val guildMusi
 
     private fun playlistEmbed(playlist: List<Track>): MessageEmbed {
         val trackInfo = playlist.first().info
-        return EmbedBuilder()
+        return embed()
             .setAuthor("THÊM PLAYLIST", null, trackInfo.artworkUrl)
             .setDescription("Đã thêm **${playlist.size}** bài hát vào hàng chờ!")
             .setFooter("💖 Âm nhạc đi trước tình yêu theo sau", event.jda.selfUser.avatarUrl)
