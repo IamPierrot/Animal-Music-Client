@@ -44,7 +44,7 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
 
         var msg: Message? = null
         try {
-            msg = guildMusicManager.metadata.sendFiles(getMusicCard(track.info)).addActionRow(row).complete()
+            msg = guildMusicManager.metadata?.sendFiles(getMusicCard(track.info))?.addActionRow(row)?.complete()
         } catch (e: TranscoderException) {
             logger.error(e.message)
         } catch (e: IOException) {
@@ -107,12 +107,12 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
             queue.offer(currentTrack)
             startTrack(previousTrack)
         } else {
-            guildMusicManager.metadata.sendMessageEmbeds(
+            guildMusicManager.metadata?.sendMessageEmbeds(
                 EmbedBuilder()
                     .setAuthor("Không còn bài hát nào trong lịch sử!")
                     .setColor(Color.RED)
                     .build()
-            ).queue()
+            )?.queue()
         }
     }
 
@@ -148,12 +148,12 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
                 val nextTrack = queue.poll()
                 startTrack(nextTrack)
                 if (nextTrack == null) {
-                    guildMusicManager.metadata.sendMessageEmbeds(
+                    guildMusicManager.metadata?.sendMessageEmbeds(
                         EmbedBuilder()
                             .setAuthor("Không còn bài hát nào trong danh sách!")
                             .setColor(Color.RED)
                             .build()
-                    ).queue()
+                    )?.queue()
                 }
             }
         }
@@ -188,7 +188,7 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
                     :hourglass: **Thời lượng :** `$minutes:$seconds`
                 """.trimIndent()
             )
-            .setFooter("💖 Âm nhạc đi trước tình yêu theo sau", guildMusicManager.metadata.jda.selfUser.avatarUrl)
+            .setFooter("💖 Âm nhạc đi trước tình yêu theo sau", guildMusicManager.metadata?.jda?.selfUser?.avatarUrl)
             .setThumbnail(trackInfo.artworkUrl)
             .setColor(Color.PINK)
             .build()

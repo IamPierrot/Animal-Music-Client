@@ -69,7 +69,7 @@ object MessageHandler {
             is CommandResult.Error -> sendErrorEmbed(context.event.message, result.message)
             is CommandResult.CooldownActive -> {
                 val timeStamp = "<t:${System.currentTimeMillis() / 1000 + result.remainingTime.seconds}:R>"
-                sendErrorEmbed(context.event.message, "Hãy đợi $timeStamp để sử dụng lệnh.")
+                sendErrorEmbed(context.event.message, "Hãy đợi $timeStamp để sử dụng lệnh.", result.remainingTime.toMillis())
             }
             CommandResult.InsufficientPermissions ->
                 sendErrorEmbed(context.event.message, "Bạn không đủ quyền dùng lệnh này!")

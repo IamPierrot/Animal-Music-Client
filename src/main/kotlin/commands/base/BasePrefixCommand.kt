@@ -14,7 +14,7 @@ import java.time.Duration
 // Base Command Implementation (Template Method Pattern)
 abstract class BasePrefixCommand : PrefixCommand {
     private val logger: Logger = getLogger(this::class.java)
-    open val commandConfig: CommandConfig = CommandConfig()
+    open val commandConfig: CommandConfig = CommandConfig.Builder().build()
     protected open val cooldownScope: CooldownScope = CooldownScope.USER
 
     private val cooldownManager = CooldownManager()
@@ -33,7 +33,6 @@ abstract class BasePrefixCommand : PrefixCommand {
             return CommandResult.CooldownActive(remainingCooldown)
         }
 
-        // Execute command
         return try {
             executeCommand(context).also { result ->
                 if (result is CommandResult.Success) {

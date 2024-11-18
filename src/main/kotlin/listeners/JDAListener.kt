@@ -1,6 +1,5 @@
 package dev.pierrot.listeners
 
-import dev.pierrot.App
 import dev.pierrot.commands.core.CommandRegistry
 import dev.pierrot.commands.core.MessageHandler
 import dev.pierrot.getLogger
@@ -10,7 +9,6 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter
 
 class JDAListener : ListenerAdapter() {
     companion object {
-        private val lavalinkClient = App.lavalinkClient
         private val logger = getLogger(JDAListener::class.java)
     }
 

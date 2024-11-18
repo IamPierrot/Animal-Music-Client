@@ -24,29 +24,19 @@ fun getLogger(clazz: Class<*>): Logger {
     return LoggerFactory.getLogger(clazz)
 }
 
-fun getOrCreateMusicManager(guildId: String, metadata: MessageChannelUnion): GuildMusicManager {
+fun getOrCreateMusicManager(guildId: String, metadata: MessageChannelUnion? = null): GuildMusicManager {
     synchronized(JDAListener::class.java) {
-        val guildMusicManager = musicManagers.computeIfAbsent(guildId) { id ->
-            GuildMusicManager(
-                id,
-                metadata
-            )
-        }
-        if (guildMusicManager.metadata.id !== metadata.id) {
+        val guildMusicManager = getOrCreateMusicManager(guildId)
+
+        if (guildMusicManager.metadata?.id !== metadata?.id) {
             guildMusicManager.metadata = metadata
         }
         return guildMusicManager
     }
 }
 
-fun getOrCreateMusicManager(guildId: String): GuildMusicManager? {
-    synchronized(JDAListener::class.java) {
-        return musicManagers.getOrDefault(guildId, null)
-    }
-}
-
 @OptIn(DelicateCoroutinesApi::class)
-fun setTimeout(block: () -> Unit, delayMillis: Long) {
+fun setTimeout(block: () -> Any, delayMillis: Long) {
     try {
         GlobalScope.launch {
             delay(delayMillis)
@@ -68,11 +58,11 @@ fun joinHelper(event: MessageReceivedEvent) {
     getOrCreateMusicManager(member.guild.id, event.channel)
 }
 
-fun capitalizeFirstLetter(input: String?): String? {
-    if (input.isNullOrEmpty()) {
-        return input
+fun String.toCapital(): String {
+    if (this.isEmpty()) {
+        return this
     }
-    return input.substring(0, 1).uppercase(Locale.getDefault()) + input.substring(1)
+    return this.substring(0, 1).uppercase(Locale.getDefault()) + this.substring(1)
 }
 
 fun isNotSameVoice(user1: GuildVoiceState?, user2: GuildVoiceState?, message: Message): Boolean {

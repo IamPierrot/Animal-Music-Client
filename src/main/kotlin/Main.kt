@@ -39,5 +39,5 @@ fun main() {
     }
 
     animalSync = AnimalSync(config.app.clientId.toInt())
-    App.initApp()
+    App.getInstance()
 }

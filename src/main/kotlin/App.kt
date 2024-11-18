@@ -1,134 +1,151 @@
 package dev.pierrot
 
-import dev.arbjerg.lavalink.client.LavalinkClient
-import dev.arbjerg.lavalink.client.NodeOptions
+import dev.arbjerg.lavalink.client.*
 import dev.arbjerg.lavalink.client.event.*
-import dev.arbjerg.lavalink.client.getUserIdFromToken
-import dev.arbjerg.lavalink.client.loadbalancing.builtin.VoiceRegionPenaltyProvider
 import dev.arbjerg.lavalink.libraries.jda.JDAVoiceUpdateListener
 import dev.pierrot.handlers.GuildMusicManager
 import dev.pierrot.listeners.JDAListener
 import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.JDABuilder
-import net.dv8tion.jda.api.entities.GuildVoiceState
 import net.dv8tion.jda.api.requests.GatewayIntent
 import net.dv8tion.jda.api.utils.cache.CacheFlag
-import java.util.*
-
-val musicManagers = HashMap<String, GuildMusicManager>()
+import java.util.concurrent.ConcurrentHashMap
 
 class App private constructor() {
     companion object {
-        lateinit var lavalinkClient: LavalinkClient
+        @Volatile
+        private var instance: App? = null
+
+        fun getInstance(): App =
+            instance ?: synchronized(this) {
+                instance ?: App().also { instance = it }
+            }
+    }
+
+    class JDAFactory {
+        fun createJDA(token: String, lavalinkClient: LavalinkClient): JDA {
+            return JDABuilder.createDefault(token)
+                .setVoiceDispatchInterceptor(JDAVoiceUpdateListener(lavalinkClient))
+                .enableIntents(GatewayIntent.GUILD_VOICE_STATES)
+                .enableIntents(GatewayIntent.MESSAGE_CONTENT)
+                .enableCache(CacheFlag.VOICE_STATE)
+                .addEventListeners(JDAListener())
+                .build()
+                .awaitReady()
+        }
+    }
+
+    class LavalinkNodeBuilder {
+        private var name: String = "default"
+        private var serverUri: String = ""
+        private var password: String = ""
+
+        fun setName(name: String) = apply { this.name = name }
+        fun setServerUri(uri: String) = apply { this.serverUri = uri }
+        fun setPassword(password: String) = apply { this.password = password }
+
+        fun build(): NodeOptions {
+            return NodeOptions.Builder()
+                .setName(name)
+                .setServerUri(serverUri)
+                .setPassword(password)
+                .build()
+        }
+    }
+
+    interface LavalinkEventObserver {
+        fun onTrackStart(event: TrackStartEvent)
+        fun onTrackEnd(event: TrackEndEvent)
+        fun onWebSocketClosed(event: WebSocketClosedEvent)
+        fun onReady(event: ReadyEvent)
+        fun onStats(event: StatsEvent)
+    }
+    interface MusicManagerStrategy {
+        fun getMusicManager(guildId: String): GuildMusicManager
+        fun removeMusicManager(guildId: String)
+    }
+
+    class ConcurrentMusicManagerStrategy : MusicManagerStrategy {
+        private val musicManagers = ConcurrentHashMap<String, GuildMusicManager>()
+
+        override fun getMusicManager(guildId: String): GuildMusicManager {
+            return musicManagers.computeIfAbsent(guildId) { GuildMusicManager(guildId, null) }
+        }
+
+        override fun removeMusicManager(guildId: String) {
+            musicManagers.remove(guildId)
+        }
+    }
+
+    object ServiceLocator {
         lateinit var jda: JDA
+        lateinit var lavalinkClient: LavalinkClient
+        lateinit var musicManagerStrategy: MusicManagerStrategy
+    }
 
-        private const val SESSION_INVALID: Int = 4006
-        private val logger = getLogger(App::class.java)
+    class LavalinkEvent : LavalinkEventObserver {
+        private val logger = getLogger(LavalinkEvent::class.java)
+        private val SESSION_INVALID: Int = 4006
 
-        fun initApp() {
-            App()
-
-            loadLavaLinkEvent()
-            lavaLinkRegisterEvents()
+        override fun onTrackStart(event: TrackStartEvent) {
+            logger.info("Track started: {}", event.track.info)
+            ServiceLocator.musicManagerStrategy.getMusicManager(event.guildId.toString())
+                .scheduler.onTrackStart(event)
         }
 
-        private fun lavaLinkRegisterEvents() {
-            registerLavalinkNodes()
-            registerLavalinkListeners()
+        override fun onTrackEnd(event: TrackEndEvent) {
+            ServiceLocator.musicManagerStrategy.getMusicManager(event.guildId.toString())
+                .scheduler.onTrackEnd(event)
         }
 
-        private fun registerLavalinkNodes() {
-            lavalinkClient.addNode(
-                NodeOptions.Builder()
-                    .setName("localhost")
-                    .setServerUri("http://localhost:${config.app.port}")
-                    .setPassword("youshallnotpass")
-                    .build()
+        override fun onWebSocketClosed(event: WebSocketClosedEvent) {
+            if (event.code == SESSION_INVALID) {
+                val guild = ServiceLocator.jda.getGuildById(event.guildId) ?: return
+                val voiceState = guild.selfMember.voiceState ?: return
+                val connectedChannel = voiceState.channel ?: return
+                ServiceLocator.jda.directAudioController.reconnect(connectedChannel)
+            }
+        }
+
+        override fun onReady(event: ReadyEvent) {
+            logger.info("Node '{}' is ready, session id is '{}'!", event.node.name, event.sessionId)
+        }
+
+        override fun onStats(event: StatsEvent) {
+            logger.info(
+                "Node '{}' stats: {}/{} players (links: {})",
+                event.node.name,
+                event.playingPlayers,
+                event.players,
+                ServiceLocator.lavalinkClient.links.size
             )
         }
-
-        private fun registerLavalinkListeners() {
-            lavalinkClient.on(ReadyEvent::class.java).subscribe { event: ReadyEvent ->
-                val node = event.node
-                logger.info(
-                    "Node '{}' is ready, session id is '{}'!",
-                    node.name,
-                    event.sessionId
-                )
-            }
-
-            lavalinkClient.on(StatsEvent::class.java).subscribe { event: StatsEvent ->
-                val node = event.node
-                logger.info(
-                    "Node '{}' has stats, current players: {}/{} (link count {})",
-                    node.name,
-                    event.playingPlayers,
-                    event.players,
-                    lavalinkClient.links.size
-                )
-            }
-
-            lavalinkClient.on(TrackStartEvent::class.java).subscribe { event: TrackStartEvent ->
-                val node = event.node
-                logger.info(
-                    "{}: track started: {}",
-                    node.name,
-                    event.track.info
-                )
-                Optional.ofNullable(musicManagers[event.guildId.toString()]).ifPresent { guildMusicManager ->
-                    guildMusicManager.scheduler.onTrackStart(event)
-                }
-            }
-
-            lavalinkClient.on<TrackEndEvent>(TrackEndEvent::class.java).subscribe { event: TrackEndEvent ->
-                Optional.ofNullable(musicManagers[event.guildId.toString()]).ifPresent { guildMusicManager ->
-                    guildMusicManager.scheduler.onTrackEnd(event)
-                }
-            }
-
-            lavalinkClient.on(EmittedEvent::class.java).subscribe { event: EmittedEvent ->
-                val node = event.node
-                logger.info(
-                    "Node '{}' emitted event: {}",
-                    node.name,
-                    event
-                )
-            }
-        }
-
-        private fun loadLavaLinkEvent() {
-            lavalinkClient.loadBalancer.addPenaltyProvider(VoiceRegionPenaltyProvider())
-
-            lavalinkClient.on(WebSocketClosedEvent::class.java).subscribe { event: WebSocketClosedEvent ->
-                if (event.code == SESSION_INVALID) {
-                    val guildId = event.guildId
-                    val guild = jda.getGuildById(guildId) ?: return@subscribe
-
-                    val connectedChannel =
-                        Objects.requireNonNull<GuildVoiceState?>(guild.selfMember.voiceState).channel
-                            ?: return@subscribe
-
-                    jda.directAudioController.reconnect(connectedChannel)
-                }
-            }
-        }
     }
-
-    private val token: String = config.app.token
 
     init {
-        lavalinkClient = LavalinkClient(getUserIdFromToken(token))
+        ServiceLocator.lavalinkClient = LavalinkClient(getUserIdFromToken(config.app.token))
+        ServiceLocator.jda = JDAFactory().createJDA(config.app.token, ServiceLocator.lavalinkClient)
+        ServiceLocator.musicManagerStrategy = ConcurrentMusicManagerStrategy()
 
-        jda = JDABuilder.createDefault(token)
-            .setVoiceDispatchInterceptor(JDAVoiceUpdateListener(lavalinkClient))
-            .enableIntents(GatewayIntent.GUILD_VOICE_STATES)
-            .enableIntents(GatewayIntent.MESSAGE_CONTENT)
-            .enableCache(CacheFlag.VOICE_STATE)
-            .addEventListeners(JDAListener())
-            .build()
-            .awaitReady()
-
+        setupLavalink()
     }
 
+    private fun setupLavalink() {
+        val node = LavalinkNodeBuilder()
+            .setName("localhost")
+            .setServerUri("http://localhost:${config.app.port}")
+            .setPassword("youshallnotpass")
+            .build()
 
+        ServiceLocator.lavalinkClient.addNode(node)
+
+        val eventHandler = LavalinkEvent()
+        with(ServiceLocator.lavalinkClient) {
+            on(TrackStartEvent::class.java).subscribe(eventHandler::onTrackStart)
+            on(TrackEndEvent::class.java).subscribe(eventHandler::onTrackEnd)
+            on(WebSocketClosedEvent::class.java).subscribe(eventHandler::onWebSocketClosed)
+            on(ReadyEvent::class.java).subscribe(eventHandler::onReady)
+            on(StatsEvent::class.java).subscribe(eventHandler::onStats)
+        }
+    }
 }

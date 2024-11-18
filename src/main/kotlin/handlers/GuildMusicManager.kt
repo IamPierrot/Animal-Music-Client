@@ -8,9 +8,9 @@ import net.dv8tion.jda.api.entities.channel.unions.MessageChannelUnion
 import java.util.*
 import java.util.concurrent.atomic.AtomicReference
 
-class GuildMusicManager(private val guildId: String, var metadata: MessageChannelUnion) {
+class GuildMusicManager(private val guildId: String, var metadata: MessageChannelUnion?) {
 
-    private val lavalinkClient = App.lavalinkClient
+    private val lavalinkClient = App.ServiceLocator.lavalinkClient
     val scheduler = TrackScheduler(this)
     fun getCurrentTrack(): Track? {
         val result = AtomicReference<Track?>()
