@@ -3,7 +3,7 @@ package dev.pierrot.commands.types
 import dev.pierrot.commands.core.CommandContext
 
 // Cooldown Strategy (Strategy Pattern)
-enum class CooldownScope {
+enum class CooldownScopes {
     USER {
         override fun getKey(context: CommandContext) = "user:${context.event.author.id}"
     },

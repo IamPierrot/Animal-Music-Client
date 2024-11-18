@@ -8,7 +8,7 @@ import dev.pierrot.commands.core.CommandResult
 class Ping : BasePrefixCommand() {
     override val name = "ping"
     override val description = "Kiểm tra độ trễ"
-    override val aliases = arrayOf("p")
+    override val aliases = emptyArray<String>()
     override val commandConfig: CommandConfig
         get() = CommandConfig.Builder()
             .withCategory("Info")

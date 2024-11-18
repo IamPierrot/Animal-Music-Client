@@ -84,7 +84,7 @@ class App private constructor() {
     }
 
     class LavalinkEvent : LavalinkEventObserver {
-        private val logger = getLogger(LavalinkEvent::class.java)
+        private val logger = getLogger("LavalinkEvent")
         private val SESSION_INVALID: Int = 4006
 
         override fun onTrackStart(event: TrackStartEvent) {

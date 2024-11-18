@@ -26,7 +26,7 @@ fun getLogger(clazz: Class<*>): Logger {
 
 fun getOrCreateMusicManager(guildId: String, metadata: MessageChannelUnion? = null): GuildMusicManager {
     synchronized(JDAListener::class.java) {
-        val guildMusicManager = getOrCreateMusicManager(guildId)
+        val guildMusicManager = App.ServiceLocator.musicManagerStrategy.getMusicManager(guildId)
 
         if (guildMusicManager.metadata?.id !== metadata?.id) {
             guildMusicManager.metadata = metadata

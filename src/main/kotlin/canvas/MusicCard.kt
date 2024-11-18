@@ -191,32 +191,33 @@ private fun getMusicCardOption(
 
 @Throws(TranscoderException::class, IOException::class)
 private fun getLightColors(imageUrl: String?): List<Color> {
+    requireNotNull(imageUrl) { "Image URL must not be null" }
+
     val image = loadImage(imageUrl)
-    val lightColors: MutableList<Color> = ArrayList()
+    val lightColors = mutableListOf<Color>()
     val width = image.width
     val height = image.height
-
-    for (x in 0 .. width) {
+    outerLoop@ for (x in 0 .. width) {
         for (y in 0 .. height) {
-            val color = Color(image.getRGB(x, y))
+            val rgb = image.getRGB(x, y)
+            val color = Color(rgb, true)
             if (isLightColor(color)) {
                 lightColors.add(color)
-                break
+                break@outerLoop
             }
         }
-        if (lightColors.isNotEmpty()) break
     }
 
     return lightColors
 }
 
 private fun isLightColor(color: Color): Boolean {
-    val brightness = (0.299 * color.red + 0.587 * color.green + 0.114 * color.blue) / 255
+    val rgbComponents = color.getRGBColorComponents(null)
+    val brightness = (0.299 * rgbComponents[0] + 0.587 * rgbComponents[1] + 0.114 * rgbComponents[2])
     return brightness > 0.7
 }
 
-
 // Method to convert RGB to Hex
 private fun rgbToHex(r: Int, g: Int, b: Int): String {
-    return String.format("#%02x%02x%02x", r, g, b)
+    return "#%02X%02X%02X".format(r, g, b)
 }
