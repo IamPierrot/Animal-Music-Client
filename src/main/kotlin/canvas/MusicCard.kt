@@ -4,9 +4,13 @@ import dev.arbjerg.lavalink.protocol.v4.TrackInfo
 import dev.pierrot.canvas.MusicCardOption
 import net.dv8tion.jda.api.utils.FileUpload
 import org.apache.batik.transcoder.TranscoderException
-import java.awt.*
+import java.awt.BasicStroke
+import java.awt.Color
+import java.awt.Font
 import java.awt.image.BufferedImage
-import java.io.*
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.util.*
 import javax.imageio.ImageIO
 
@@ -197,8 +201,8 @@ private fun getLightColors(imageUrl: String?): List<Color> {
     val lightColors = mutableListOf<Color>()
     val width = image.width
     val height = image.height
-    outerLoop@ for (x in 0 .. width) {
-        for (y in 0 .. height) {
+    outerLoop@ for (x in 0 until width) {
+        for (y in 0 until height) {
             val rgb = image.getRGB(x, y)
             val color = Color(rgb, true)
             if (isLightColor(color)) {
