@@ -48,7 +48,6 @@ object CommandRegistry {
         prefixCommand.aliases.forEach { alias ->
             aliases[alias.lowercase()] = prefixCommand.name.lowercase()
         }
-        logger.info("Registered command: ${prefixCommand.name}")
     }
 
     fun getCommand(name: String): PrefixCommand? {

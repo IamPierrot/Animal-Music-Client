@@ -25,7 +25,6 @@ fun isRunningFromJar(): Boolean {
 }
 
 lateinit var config: Config
-lateinit var animalSync: AnimalSync
 
 fun main() {
     val configPath = if (isRunningFromJar()) "config.yml" else "src/main/resources/config.yml"
@@ -38,6 +37,6 @@ fun main() {
         throw RuntimeException(error)
     }
 
-    animalSync = AnimalSync(config.app.clientId.toInt())
+    AnimalSync.initialize(config.app.clientId.toInt())
     App.getInstance()
 }

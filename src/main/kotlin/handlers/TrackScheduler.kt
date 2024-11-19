@@ -7,6 +7,7 @@ import dev.arbjerg.lavalink.client.player.Track
 import dev.pierrot.LoopMode
 import dev.pierrot.embed
 import dev.pierrot.getLogger
+import dev.pierrot.listeners.AnimalSync
 import dev.pierrot.setTimeout
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message

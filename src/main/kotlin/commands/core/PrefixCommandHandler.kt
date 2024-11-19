@@ -2,6 +2,7 @@ package dev.pierrot.commands.core
 
 import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.config
+import dev.pierrot.embed
 import dev.pierrot.isNotSameVoice
 import dev.pierrot.tempReply
 import net.dv8tion.jda.api.EmbedBuilder
@@ -34,7 +35,7 @@ object MessageHandler {
 
             if (memberVoiceState?.channel == null) {
                 tempReply(event.message,
-                    EmbedBuilder()
+                    embed()
                         .setAuthor("❌ | Bạn cần vào voice để thực hiện lệnh này!")
                         .build()
                 )
