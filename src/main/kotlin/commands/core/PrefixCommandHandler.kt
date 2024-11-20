@@ -3,11 +3,13 @@ package dev.pierrot.commands.core
 import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.config
 import dev.pierrot.embed
+import dev.pierrot.joinHelper
 import dev.pierrot.tempReply
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import java.awt.Color
+import java.util.*
 
 // Message Handler (Facade Pattern)
 object MessageHandler {
@@ -28,7 +30,7 @@ object MessageHandler {
             handleUnknownCommand(event, isMentionPrefix)
             return
         }
-        if (command.commandConfig.voiceChannel) {
+        if (command.commandConfig.voiceChannel || command.commandConfig.category.lowercase(Locale.getDefault()) == "music") {
             val memberVoiceState = event.member?.voiceState
             val selfVoiceState = event.guild.selfMember.voiceState
 
@@ -41,7 +43,7 @@ object MessageHandler {
                 )
                 return
             }
-            if (selfVoiceState?.channel != null && memberVoiceState.channel?.id != selfVoiceState.channel?.id) return
+            if (selfVoiceState?.channel?.id != null && memberVoiceState.channel?.id != selfVoiceState.channel?.id) return
         }
 
 

@@ -75,7 +75,7 @@ class Play : BasePrefixCommand() {
             return CommandResult.Success
 
         } catch (e: Exception) {
-            return CommandResult.Error("Sync timeout")
+            return CommandResult.Success
         } finally {
             playSubscription?.unsubscribe()
             noClientSubscription?.unsubscribe()
@@ -86,7 +86,6 @@ class Play : BasePrefixCommand() {
         val guildId = context.event.guild.id
 
         val member = context.event.guild.selfMember
-        val voiceState = member.voiceState
         val voiceChannelId = context.event.member?.voiceState?.id
         joinHelper(context.event)
 

@@ -1,14 +1,17 @@
 package dev.pierrot.listeners
 
-import com.microsoft.signalr.*
+import com.microsoft.signalr.HubConnection
+import com.microsoft.signalr.HubConnectionBuilder
+import com.microsoft.signalr.HubConnectionState
+import com.microsoft.signalr.Subscription
 import dev.pierrot.config
 import dev.pierrot.getLogger
 import io.reactivex.rxjava3.core.Single
 import io.reactivex.rxjava3.disposables.Disposable
 import io.reactivex.rxjava3.schedulers.Schedulers
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 class AnimalSync private constructor(val clientId: Int) {
     companion object {
@@ -69,9 +72,13 @@ class AnimalSync private constructor(val clientId: Int) {
         return on(eventName, handler, String::class.java)
     }
 
-    fun onMap(eventName: String, handler: (Map<String, Any>) -> Unit): Subscription {
-        @Suppress("UNCHECKED_CAST")
-        return on(eventName, handler, Map::class.java as Class<Map<String, Any>>)
+    fun onMap(eventName: String, handler: (Map<String, Any>) -> Unit): Subscription? {
+        try {
+            @Suppress("UNCHECKED_CAST")
+            return on(eventName, handler, Map::class.java as Class<Map<String, Any>>)
+        } catch (err: Exception) {
+            return null
+        }
     }
 
     fun onAny(eventName: String, handler: (Any) -> Unit): Subscription {
@@ -123,7 +130,8 @@ class AnimalSync private constructor(val clientId: Int) {
 
     private fun checkConnectionAndReconnect() {
         if (hubConnection.connectionState != HubConnectionState.CONNECTED &&
-            !isReconnecting.get()) {
+            !isReconnecting.get()
+        ) {
             startReconnecting()
         }
     }
