@@ -3,7 +3,6 @@ package dev.pierrot.commands.core
 import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.config
 import dev.pierrot.embed
-import dev.pierrot.isNotSameVoice
 import dev.pierrot.tempReply
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
@@ -34,16 +33,15 @@ object MessageHandler {
             val selfVoiceState = event.guild.selfMember.voiceState
 
             if (memberVoiceState?.channel == null) {
-                tempReply(event.message,
+                tempReply(
+                    event.message,
                     embed()
                         .setAuthor("❌ | Bạn cần vào voice để thực hiện lệnh này!")
                         .build()
                 )
                 return
             }
-            if (isNotSameVoice(memberVoiceState, selfVoiceState, event.message)) {
-                return
-            }
+            if (selfVoiceState?.channel != null && memberVoiceState.channel?.id != selfVoiceState.channel?.id) return
         }
 
 
@@ -108,7 +106,7 @@ object MessageHandler {
 
     private fun sendErrorEmbed(message: Message, error: String, delay: Long = 20000) {
         val embed = EmbedBuilder()
-            .setDescription("❌ $error")
+            .setDescription("❌ | Có lỗi xảy ra: \n```\n${error.substring(0..error.length / 2)}\n```")
             .setColor(Color.RED)
             .build()
 

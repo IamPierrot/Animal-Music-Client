@@ -9,34 +9,46 @@ import java.io.IOException
 data class Config(
     val app: AppConfig = AppConfig()
 ) {
-    class AppConfig {
-        lateinit var prefix: String
-        lateinit var token: String
-        lateinit var port: Number
-        lateinit var mongo_uri: String
-        lateinit var websocket: String
-        lateinit var clientId: Number
-    }
+    data class AppConfig(
+        val prefix: String = "",
+        val token: String = "",
+        val port: Int = 8080,
+        val mongo_uri: String = "",
+        val websocket: String = "",
+        val clientId: Int = 0
+    )
 }
 
 fun isRunningFromJar(): Boolean {
     val resource = object {}.javaClass.getResource("/${object {}.javaClass.name.replace('.', '/')}.class")
-    return resource != null && resource.protocol == "jar"
+    return resource?.protocol == "jar"
 }
 
 lateinit var config: Config
 
 fun main() {
-    val configPath = if (isRunningFromJar()) "config.yml" else "src/main/resources/config.yml"
-    val file = File(configPath)
+    val configPath = if (isRunningFromJar()) {
+        File("config.yml")
+    } else {
+        File("src/main/resources/config.yml")
+    }
+
+    if (!configPath.exists()) {
+        System.err.println("Config file not found: ${configPath.absolutePath}")
+        return
+    }
+
     val objectMapper = ObjectMapper(YAMLFactory())
 
     try {
-        config = objectMapper.readValue(file, Config::class.java)
+        config = objectMapper.readValue(configPath, Config::class.java)
+        AnimalSync.initialize(config.app.clientId)
+        App.getInstance()
     } catch (error: IOException) {
-        throw RuntimeException(error)
+        System.err.println("Error reading config file: ${error.message}")
+        error.printStackTrace()
+    } catch (error: Exception) {
+        System.err.println("Application failed to start: ${error.message}")
+        error.printStackTrace()
     }
-
-    AnimalSync.initialize(config.app.clientId.toInt())
-    App.getInstance()
 }

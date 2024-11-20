@@ -5,26 +5,55 @@ import dev.arbjerg.lavalink.client.player.*
 import dev.pierrot.App
 import dev.pierrot.embed
 import dev.pierrot.listeners.AnimalSync
+import dev.pierrot.models.PlayerEvent
+import dev.pierrot.models.PlayerSyncData
 import net.dv8tion.jda.api.entities.MessageEmbed
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import java.awt.Color
 
-class AudioLoader(private val guildMusicManager: GuildMusicManager, private val voiceChannelId: String) :
+class AudioLoader(
+    private val event: MessageReceivedEvent,
+    private val guildMusicManager: GuildMusicManager,
+    private val voiceChannelId: String
+) :
     AbstractAudioLoadResultHandler() {
+
     override fun ontrackLoaded(result: TrackLoaded) {
         val track = result.track
+        val syncData = PlayerSyncData().apply {
+            eventExtend = "event"
+            guildId = guildMusicManager.metadata?.asGuildMessageChannel()?.guild?.id ?: ""
+            voiceChannelId = this@AudioLoader.voiceChannelId
+            musicList = listOf(track.info.title)
+            event = PlayerEvent().apply {
+                type = "TrackLoaded"
+                guildId = guildMusicManager.metadata?.asGuildMessageChannel()?.guild?.id ?: ""
+                channelId = this@AudioLoader.voiceChannelId
+            }
+        }
 
-        syncPlayer(listOf(track.info.title))
+        sendPlayerSync(syncData)
 
-        guildMusicManager.metadata?.sendMessageEmbeds(trackEmbed(track))?.queue()
-
+        event.message.replyEmbeds(trackEmbed(track)).queue()
         guildMusicManager.scheduler.enqueue(track)
     }
 
     override fun onPlaylistLoaded(result: PlaylistLoaded) {
-        guildMusicManager.scheduler.enqueuePlaylist(result.tracks)
-        syncPlayer(result.tracks.map { it.info.title })
+        val syncData = PlayerSyncData().apply {
+            eventExtend = "event"
+            guildId = guildMusicManager.metadata?.asGuildMessageChannel()?.guild?.id ?: ""
+            voiceChannelId = this@AudioLoader.voiceChannelId
+            musicList = result.tracks.map { it.info.title }
+            event = PlayerEvent().apply {
+                type = "PlaylistLoaded"
+                guildId = guildMusicManager.metadata?.asGuildMessageChannel()?.guild?.id ?: ""
+                channelId = this@AudioLoader.voiceChannelId
+            }
+        }
+        sendPlayerSync(syncData)
 
-        guildMusicManager.metadata?.sendMessageEmbeds(playlistEmbed(result.tracks))?.queue()
+        guildMusicManager.scheduler.enqueuePlaylist(result.tracks)
+        event.message.replyEmbeds(playlistEmbed(result.tracks)).queue()
     }
 
     override fun onSearchResultLoaded(result: SearchResult) {
@@ -36,19 +65,56 @@ class AudioLoader(private val guildMusicManager: GuildMusicManager, private val 
         }
 
         val firstTrack = tracks.first()
-        syncPlayer(listOf(firstTrack.info.title))
 
-        guildMusicManager.metadata?.sendMessageEmbeds(trackEmbed(firstTrack))?.queue()
+        val syncData = PlayerSyncData().apply {
+            eventExtend = "event"
+            guildId = guildMusicManager.metadata?.asGuildMessageChannel()?.guild?.id ?: ""
+            voiceChannelId = this@AudioLoader.voiceChannelId
+            musicList = listOf(firstTrack.info.title)
+            event = PlayerEvent().apply {
+                type = "SearchResultLoaded"
+                guildId = guildMusicManager.metadata?.asGuildMessageChannel()?.guild?.id ?: ""
+                channelId = this@AudioLoader.voiceChannelId
+            }
+        }
+        sendPlayerSync(syncData)
 
+        event.message.replyEmbeds(trackEmbed(firstTrack)).queue()
         guildMusicManager.scheduler.enqueue(firstTrack)
     }
 
     override fun noMatches() {
-        guildMusicManager.metadata?.sendMessage("No matches found for your input!")?.queue()
+        event.message.reply("No matches found for your input!").queue()
     }
 
     override fun loadFailed(result: LoadFailed) {
-        guildMusicManager.metadata?.sendMessage("Failed to load track! " + result.exception.message)?.queue()
+        event.message.reply("Failed to load track! " + result.exception.message)?.queue()
+        val syncData = PlayerSyncData().apply {
+            eventExtend = "event"
+            guildId = guildMusicManager.metadata?.asGuildMessageChannel()?.guild?.id ?: ""
+            voiceChannelId = this@AudioLoader.voiceChannelId
+            event = PlayerEvent().apply {
+                type = "LoadFailed"
+                guildId = guildMusicManager.metadata?.asGuildMessageChannel()?.guild?.id ?: ""
+                channelId = this@AudioLoader.voiceChannelId
+            }
+        }
+
+        sendPlayerSync(syncData)
+    }
+
+    private fun sendPlayerSync(data: PlayerSyncData) {
+        try {
+            guildMusicManager.metadata?.asGuildMessageChannel()?.guild?.id?.let {
+                AnimalSync.getInstance().send(
+                    "player_sync",
+                    AnimalSync.getInstance().clientId.toString(),
+                    data
+                )
+            }
+        } catch (e: Exception) {
+            println("Failed to sync player state: ${e.message}")
+        }
     }
 
     private fun trackEmbed(track: Track): MessageEmbed {
@@ -71,17 +137,4 @@ class AudioLoader(private val guildMusicManager: GuildMusicManager, private val 
             .setThumbnail(trackInfo.artworkUrl)
             .setColor(Color.pink).build()
     }
-
-    private fun syncPlayer(tracks: List<String>): Unit {
-        guildMusicManager.metadata?.asGuildMessageChannel()?.guild?.id?.let {
-            AnimalSync.getInstance().send(
-                "player_sync",
-                AnimalSync.getInstance().clientId.toString(),
-                voiceChannelId,
-                it,
-                tracks
-            )
-        }
-    }
-
 }
