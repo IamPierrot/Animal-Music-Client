@@ -1,12 +1,13 @@
 package dev.pierrot.commands.base
 
 import dev.pierrot.commands.config.CommandConfig
-import dev.pierrot.commands.core.PrefixCommand
 import dev.pierrot.commands.core.CommandContext
 import dev.pierrot.commands.core.CommandResult
 import dev.pierrot.commands.core.CooldownManager
+import dev.pierrot.commands.core.PrefixCommand
 import dev.pierrot.commands.types.CooldownScopes
 import dev.pierrot.getLogger
+import dev.pierrot.listeners.AnimalSync
 import dev.pierrot.tempReply
 import org.slf4j.Logger
 import java.time.Duration
@@ -16,6 +17,7 @@ abstract class BasePrefixCommand : PrefixCommand {
     private val logger: Logger = getLogger(this::class.java)
     override val commandConfig: CommandConfig = CommandConfig.Builder().build()
     protected open val cooldownScope: CooldownScopes = CooldownScopes.USER
+    protected val animalSync: AnimalSync = AnimalSync.getInstance()
 
     private val cooldownManager = CooldownManager()
 
