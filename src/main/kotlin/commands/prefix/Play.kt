@@ -34,67 +34,22 @@ class Play : BasePrefixCommand() {
             return CommandResult.InvalidArguments
         }
 
-        val guild = context.event.guild
-        val voiceChannel = context.event.member?.voiceState?.channel
-            ?: return CommandResult.Error("Bạn phải vào voice trước")
-
-        val messageId = context.event.messageId
-        val responseFuture = CompletableFuture<Boolean>()
-        var playSubscription: Subscription? = null
-        var noClientSubscription: Subscription? = null
-
         try {
-            playSubscription = animalSync.onMap("play") { message ->
-                if (message["messageId"] as String == messageId) {
-                    handleSyncMessage(context)
-                    responseFuture.complete(true)
-                }
-            }
+            val guildId = context.event.guild.id
 
-            noClientSubscription = animalSync.onMap("no_client") { message ->
-                if (message["messageId"] as String == messageId) {
-                    responseFuture.complete(false)
-                }
-            }
+            val voiceChannelId = context.event.member?.voiceState?.id
+            joinHelper(context.event)
 
-            animalSync.send(
-                "sync_play",
-                messageId,
-                voiceChannel.id,
-                guild.id,
-                context.event.channel.id,
-                context.args
-            )
+            val identifier = context.args.joinToString(" ")
+            val query = if (identifier.startsWith("https")) identifier else "ytsearch:$identifier"
 
-            val hasAvailableBot = responseFuture.get(5, TimeUnit.SECONDS)
-            if (!hasAvailableBot) {
-                context.event.channel.sendMessage("Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau.")
-                    .queue()
-                return CommandResult.Success
-            }
+            val link = App.ServiceLocator.lavalinkClient.getOrCreateLink(guildId.toLong())
+            val guildMusicManager = getOrCreateMusicManager(guildId, context.event.channel)
+
+            link.loadItem(query).subscribe(AudioLoader(context.event, guildMusicManager, voiceChannelId!!))
             return CommandResult.Success
-
         } catch (e: Exception) {
             return CommandResult.Success
-        } finally {
-            playSubscription?.unsubscribe()
-            noClientSubscription?.unsubscribe()
         }
-    }
-
-    private fun handleSyncMessage(context: CommandContext) {
-        val guildId = context.event.guild.id
-
-        val member = context.event.guild.selfMember
-        val voiceChannelId = context.event.member?.voiceState?.id
-        joinHelper(context.event)
-
-        val identifier = context.args.joinToString(" ")
-        val query = if (identifier.startsWith("https")) identifier else "ytsearch:$identifier"
-
-        val link = App.ServiceLocator.lavalinkClient.getOrCreateLink(guildId.toLong())
-        val guildMusicManager = getOrCreateMusicManager(guildId, context.event.channel)
-
-        link.loadItem(query).subscribe(AudioLoader(context.event, guildMusicManager, voiceChannelId!!))
     }
 }

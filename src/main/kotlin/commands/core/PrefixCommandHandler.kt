@@ -1,9 +1,11 @@
 package dev.pierrot.commands.core
 
+import com.microsoft.signalr.Subscription
 import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.config
 import dev.pierrot.embed
-import dev.pierrot.joinHelper
+import dev.pierrot.getLogger
+import dev.pierrot.listeners.AnimalSync
 import dev.pierrot.tempReply
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
@@ -13,6 +15,9 @@ import java.util.*
 
 // Message Handler (Facade Pattern)
 object MessageHandler {
+    private val animalSync = AnimalSync.getInstance()
+
+
     fun handle(event: MessageReceivedEvent) {
         if (event.author.isBot) return
 
@@ -30,6 +35,19 @@ object MessageHandler {
             handleUnknownCommand(event, isMentionPrefix)
             return
         }
+        val context = CommandContext(
+            event = event,
+            args = args.drop(1),
+            rawArgs = rawArgs.substringAfter(args[0]).trim(),
+            prefix = prefix,
+            isMentionPrefix = isMentionPrefix
+        )
+
+        val guild = event.guild
+        val voiceChannel = event.member?.voiceState?.channel
+
+        val messageId = event.messageId
+
         if (command.commandConfig.voiceChannel || command.commandConfig.category.lowercase(Locale.getDefault()) == "music") {
             val memberVoiceState = event.member?.voiceState
             val selfVoiceState = event.guild.selfMember.voiceState
@@ -43,19 +61,57 @@ object MessageHandler {
                 )
                 return
             }
-            if (selfVoiceState?.channel?.id != null && memberVoiceState.channel?.id != selfVoiceState.channel?.id) return
+
+            if (command.commandConfig.category == "music") {
+                if (selfVoiceState?.channel?.id != null && memberVoiceState.channel?.id != selfVoiceState.channel?.id) return
+
+                assert(voiceChannel != null)
+
+                animalSync.onMap("play") { message ->
+                    if (message["messageId"] as String == messageId) {
+                        handleCommandResult(command.execute(context), context, command)
+                    }
+                }
+
+                animalSync.onMap("no_client") { message ->
+                    if (message["messageId"] as String == messageId) {
+                        context.event.channel.sendMessage("Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau.")
+                            .queue()
+                    }
+                }
+                try {
+
+                    animalSync.send(
+                        "sync_play",
+                        messageId,
+                        voiceChannel?.id,
+                        guild.id,
+                        event.channel.id,
+                        args
+                    )
+                } catch (error: Exception) {
+                    getLogger("PrefixCommand").warn(error.message)
+                    return
+                }
+                return
+            }
         }
-
-
-        val context = CommandContext(
-            event = event,
-            args = args.drop(1),
-            rawArgs = rawArgs.substringAfter(args[0]).trim(),
-            prefix = prefix,
-            isMentionPrefix = isMentionPrefix
-        )
-
-        handleCommandResult(command.execute(context), context, command)
+        animalSync.onMap("command") { message ->
+            if (message["messageId"] as String == messageId) {
+                handleCommandResult(command.execute(context), context, command)
+            }
+        }
+        try {
+                animalSync.send(
+                    "command_sync",
+                    messageId,
+                    guild.id,
+                    context.event.channel.id,
+                    voiceChannel?.id
+                )
+        } catch (error: Exception) {
+            return
+        }
     }
 
     private fun determinePrefix(event: MessageReceivedEvent): Pair<String, Boolean> {

@@ -9,6 +9,7 @@ import dev.pierrot.getLogger
 import io.reactivex.rxjava3.core.Single
 import io.reactivex.rxjava3.disposables.Disposable
 import io.reactivex.rxjava3.schedulers.Schedulers
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -25,11 +26,9 @@ class AnimalSync private constructor(val clientId: Int) {
         private val LOCK = Any()
 
         fun initialize(clientId: Int) {
-            if (instance == null) {
-                synchronized(LOCK) {
-                    if (instance == null) {
-                        instance = AnimalSync(clientId)
-                    }
+            synchronized(LOCK) {
+                if (instance == null) {
+                    instance = AnimalSync(clientId)
                 }
             }
         }
@@ -40,6 +39,49 @@ class AnimalSync private constructor(val clientId: Int) {
             )
         }
     }
+
+    private val pendingEvents = ConcurrentLinkedQueue<PendingEvent>()
+    private val pendingSubscriptions = ConcurrentLinkedQueue<PendingSubscription>()
+
+    data class PendingEvent(
+        val method: String,
+        val args: Array<out Any?>,
+        val type: EventType,
+        val returnType: Class<*>? = null,
+        val continuation: ((Any?) -> Unit)? = null
+    ) {
+        enum class EventType {
+            SEND, INVOKE
+        }
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as PendingEvent
+
+            if (method != other.method) return false
+            if (!args.contentEquals(other.args)) return false
+            if (type != other.type) return false
+            if (returnType != other.returnType) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = method.hashCode()
+            result = 31 * result + args.contentHashCode()
+            result = 31 * result + type.hashCode()
+            result = 31 * result + (returnType?.hashCode() ?: 0)
+            return result
+        }
+    }
+
+    data class PendingSubscription(
+        val eventName: String,
+        val handler: Any,
+        val clazz: Class<*>
+    )
 
     private var hubConnection: HubConnection
     private var reconnectDisposable: Disposable? = null
@@ -62,10 +104,175 @@ class AnimalSync private constructor(val clientId: Int) {
             .build()
     }
 
+    private fun processPendingEvents() {
+        val iterator = pendingEvents.iterator()
+        while (iterator.hasNext()) {
+            val pendingEvent = iterator.next()
+            try {
+                when (pendingEvent.type) {
+                    PendingEvent.EventType.SEND -> {
+                        hubConnection.send(pendingEvent.method, *pendingEvent.args)
+                        logger.info("Resent queued send event: ${pendingEvent.method}")
+                    }
+                    PendingEvent.EventType.INVOKE -> {
+                        if (pendingEvent.returnType == null) {
+                            logger.warn("Invoke event missing return type: ${pendingEvent.method}")
+                            continue
+                        }
+
+                        hubConnection.invoke(pendingEvent.returnType, pendingEvent.method, *pendingEvent.args)
+                            .subscribe(
+                                { result ->
+                                    logger.info("Successfully invoked queued event: ${pendingEvent.method}")
+                                    pendingEvent.continuation?.invoke(result)
+                                },
+                                { error ->
+                                    logger.error("Failed to invoke queued event: ${pendingEvent.method}, error: ${error.message}")
+                                    pendingEvent.continuation?.invoke(null)
+                                }
+                            )
+                    }
+                }
+                iterator.remove()
+            } catch (e: Exception) {
+                logger.error("Error processing pending event: ${e.message}")
+            }
+        }
+    }
+
+    private fun processPendingSubscriptions() {
+        val iterator = pendingSubscriptions.iterator()
+        while (iterator.hasNext()) {
+            val pendingSub = iterator.next()
+            try {
+                @Suppress("UNCHECKED_CAST")
+                when (pendingSub.clazz) {
+                    String::class.java -> {
+                        val handler = pendingSub.handler as (String) -> Unit
+                        hubConnection.on(pendingSub.eventName, handler, String::class.java)
+                    }
+                    Map::class.java -> {
+                        @Suppress("UNCHECKED_CAST")
+                        val handler = pendingSub.handler as (Map<String, Any>) -> Unit
+                        hubConnection.on(pendingSub.eventName, handler, Map::class.java as Class<Map<String, Any>>)
+                    }
+                    Any::class.java -> {
+                        val handler = pendingSub.handler as (Any) -> Unit
+                        hubConnection.on(pendingSub.eventName, handler, Any::class.java)
+                    }
+                    else -> {
+                        logger.warn("Unsupported handler type for event: ${pendingSub.eventName}")
+                        continue
+                    }
+                }
+                iterator.remove()
+            } catch (e: Exception) {
+                logger.error("Error restoring subscription: ${e.message}")
+            }
+        }
+    }
+
+    private fun setupBaseEventListeners() {
+        onString("connection") { message ->
+            logger.info("Connection message: $message")
+            retryAttempt.set(0)
+            isReconnecting.set(false)
+            processPendingSubscriptions()
+            processPendingEvents()
+        }
+
+        onAny("error") { error ->
+            logger.error("Error received: $error")
+        }
+
+        onString("disconnect") { reason ->
+            logger.warn("Disconnected: $reason")
+            startReconnecting()
+        }
+
+        hubConnection.onClosed { exception ->
+            exception?.let {
+                logger.error("Connection closed with error: ${it.message}")
+            } ?: logger.warn("Connection closed")
+
+            startReconnecting()
+        }
+    }
+
+    private fun connect() {
+        if (hubConnection.connectionState != HubConnectionState.CONNECTED) {
+            hubConnection.start()
+                .doOnSubscribe {
+                    logger.info("Attempting to connect...")
+                    isReconnecting.set(true)
+                }
+                .subscribe(
+                    {
+                        logger.info("Connected successfully")
+                        isReconnecting.set(false)
+                        retryAttempt.set(0)
+                        reconnectDisposable?.dispose()
+                        processPendingSubscriptions()
+                        processPendingEvents()
+                    },
+                    { error ->
+                        logger.warn("Failed to connect: ${error.message}")
+                        startReconnecting()
+                    }
+                )
+        }
+    }
+
+    private fun startReconnecting() {
+        scheduleReconnect()
+    }
+
+    private fun scheduleReconnect() {
+        if (MAX_RETRY_ATTEMPTS != -1 && retryAttempt.get() >= MAX_RETRY_ATTEMPTS) {
+            logger.warn("Maximum retry attempts reached")
+            isReconnecting.set(false)
+            return
+        }
+
+        val currentAttempt = retryAttempt.getAndIncrement()
+        val delay = if (currentAttempt < RETRY_DELAYS.size) {
+            RETRY_DELAYS[currentAttempt]
+        } else {
+            RETRY_DELAYS.last()
+        }
+
+        reconnectDisposable?.dispose()
+        reconnectDisposable = Single.timer(delay, TimeUnit.MILLISECONDS)
+            .subscribeOn(Schedulers.io())
+            .subscribe(
+                {
+                    logger.info("Reconnection attempt #${currentAttempt + 1}")
+                    if (hubConnection.connectionState == HubConnectionState.DISCONNECTED) {
+                        hubConnection = buildConnection()
+                        setupBaseEventListeners()
+                    }
+                    connect()
+                },
+                { error ->
+                    logger.error("Error during reconnect attempt #${currentAttempt + 1}: ${error.message}")
+                    isReconnecting.set(false)
+                    scheduleReconnect()
+                }
+            )
+    }
+
     fun <T> on(eventName: String, handler: (T) -> Unit, clazz: Class<T>): Subscription {
-        val subscription = hubConnection.on(eventName, handler, clazz)
-        subscriptions.getOrPut(eventName) { mutableListOf() }.add(subscription)
-        return subscription
+        return if (hubConnection.connectionState == HubConnectionState.CONNECTED) {
+            val subscription = hubConnection.on(eventName, handler, clazz)
+            subscriptions.getOrPut(eventName) { mutableListOf() }.add(subscription)
+            subscription
+        } else {
+            logger.warn("Connection not established. Queuing subscription for $eventName")
+            pendingSubscriptions.add(PendingSubscription(eventName, handler, clazz))
+            startReconnecting()
+
+            hubConnection.on("lmao") {}
+        }
     }
 
     fun onString(eventName: String, handler: (String) -> Unit): Subscription {
@@ -102,114 +309,30 @@ class AnimalSync private constructor(val clientId: Int) {
         subscriptions.clear()
     }
 
-    private fun setupBaseEventListeners() {
-        onString("connection") { message ->
-            logger.info("Connection message: $message")
-            retryAttempt.set(0)
-            isReconnecting.set(false)
-        }
-
-        onAny("error") { error ->
-            logger.error("Error received: $error")
-            checkConnectionAndReconnect()
-        }
-
-        onString("disconnect") { reason ->
-            logger.warn("Disconnected: $reason")
-            checkConnectionAndReconnect()
-        }
-
-        hubConnection.onClosed { exception ->
-            exception?.let {
-                logger.error("Connection closed with error: ${it.message}")
-            } ?: logger.warn("Connection closed")
-
-            checkConnectionAndReconnect()
-        }
-    }
-
-    private fun checkConnectionAndReconnect() {
-        if (hubConnection.connectionState != HubConnectionState.CONNECTED &&
-            !isReconnecting.get()
-        ) {
-            startReconnecting()
-        }
-    }
-
-    private fun connect() {
-        if (hubConnection.connectionState != HubConnectionState.CONNECTED) {
-            hubConnection.start()
-                .doOnSubscribe {
-                    logger.info("Attempting to connect...")
-                    isReconnecting.set(true)
-                }
-                .subscribe(
-                    {
-                        logger.info("Connected successfully")
-                        isReconnecting.set(false)
-                        retryAttempt.set(0)
-                        reconnectDisposable?.dispose()
-                    },
-                    { error ->
-                        logger.error("Failed to connect: ${error.message}")
-                        startReconnecting()
-                    }
-                )
-        }
-    }
-
-    private fun startReconnecting() {
-        if (isReconnecting.compareAndSet(false, true)) {
-            scheduleReconnect()
-        }
-    }
-
-    private fun scheduleReconnect() {
-        if (MAX_RETRY_ATTEMPTS != -1 && retryAttempt.get() >= MAX_RETRY_ATTEMPTS) {
-            logger.error("Maximum retry attempts reached")
-            isReconnecting.set(false)
-            return
-        }
-
-        val currentAttempt = retryAttempt.getAndIncrement()
-        val delay = if (currentAttempt < RETRY_DELAYS.size) {
-            RETRY_DELAYS[currentAttempt]
-        } else {
-            RETRY_DELAYS.last()
-        }
-
-        reconnectDisposable?.dispose()
-        reconnectDisposable = Single.timer(delay, TimeUnit.MILLISECONDS)
-            .subscribeOn(Schedulers.io())
-            .subscribe(
-                {
-                    logger.info("Reconnection attempt #${currentAttempt + 1}")
-                    if (hubConnection.connectionState == HubConnectionState.DISCONNECTED) {
-                        hubConnection = buildConnection()
-                        setupBaseEventListeners()
-                    }
-                    connect()
-                },
-                { error ->
-                    logger.error("Error during reconnect attempt #${currentAttempt + 1}: ${error.message}")
-                    isReconnecting.set(false)
-                    scheduleReconnect()
-                }
-            )
-    }
-
-    fun send(method: String, vararg args: Any) {
+    fun send(method: String, vararg args: Any?) {
         try {
             if (hubConnection.connectionState == HubConnectionState.CONNECTED) {
                 hubConnection.send(method, *args)
-//                logger.info("Sent method: $method with args: ${args.joinToString()}")
             } else {
-                logger.warn("Cannot send message - connection is not established")
-                checkConnectionAndReconnect()
+                logger.warn("Connection not established. Queuing event.")
+                pendingEvents.offer(
+                    PendingEvent(
+                        method,
+                        args,
+                        PendingEvent.EventType.SEND
+                    )
+                )
+                startReconnecting()
             }
         } catch (e: Exception) {
             logger.error("Error sending message: ${e.message}")
-            checkConnectionAndReconnect()
+            pendingEvents.offer(
+                PendingEvent(
+                    method,
+                    args,
+                    PendingEvent.EventType.SEND
+                )
+            )
         }
     }
 
@@ -217,11 +340,32 @@ class AnimalSync private constructor(val clientId: Int) {
         return if (hubConnection.connectionState == HubConnectionState.CONNECTED) {
             hubConnection.invoke(returnType, method, *args)
         } else {
-            Single.error(IllegalStateException("Connection is not established"))
+            Single.create { emitter ->
+                logger.warn("Connection not established. Queuing invoke event.")
+
+                val pendingEvent = PendingEvent(
+                    method,
+                    args,
+                    PendingEvent.EventType.INVOKE,
+                    returnType
+                ) { result ->
+                    if (result != null && returnType.isInstance(result)) {
+                        @Suppress("UNCHECKED_CAST")
+                        emitter.onSuccess(result as T)
+                    } else {
+                        emitter.onError(IllegalStateException("Invalid return type or null result"))
+                    }
+                }
+
+                pendingEvents.offer(pendingEvent)
+                startReconnecting()
+            }
         }
     }
 
     fun dispose() {
+        pendingEvents.clear()
+        pendingSubscriptions.clear()
         offAll()
         isReconnecting.set(false)
         reconnectDisposable?.dispose()

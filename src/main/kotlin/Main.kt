@@ -27,6 +27,8 @@ fun isRunningFromJar(): Boolean {
 lateinit var config: Config
 
 fun main() {
+    System.setProperty("sun.security.util.ManifestFileVerifier", "false")
+
     val configPath = if (isRunningFromJar()) {
         File("config.yml")
     } else {
@@ -42,8 +44,9 @@ fun main() {
 
     try {
         config = objectMapper.readValue(configPath, Config::class.java)
-        AnimalSync.initialize(config.app.clientId)
-        App.getInstance()
+        AnimalSync.initialize(config.app.clientId).run {
+            App.getInstance()
+        }
     } catch (error: IOException) {
         System.err.println("Error reading config file: ${error.message}")
         error.printStackTrace()
