@@ -1,7 +1,0 @@
-app:
-  token: MTI3MzE0NzY3MTYxNTYzOTU2Mg.G_iAZ7.EM0m0d_sNuFowV7llGb6TDXkaOM1EUcbZrg3Zw
-  prefix: ish
-  port: 3000
-  mongo_uri: mongodb+srv://Pierrot:catdog123@test.e34cieh.mongodb.net/?retryWrites=true&w=majority&appName=Test
-  websocket: ws://localhost:123
-  clientId: 1
