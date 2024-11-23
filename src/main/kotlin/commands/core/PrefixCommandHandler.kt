@@ -104,19 +104,38 @@ object MessageHandler {
                 return false
             }
 
-            handleMusicCommand(context)
+            handleMusicCommand(command, context).run { subscriptions.forEach { it.unsubscribe() } }
             return false
         }
 
         return true
     }
 
-    private fun handleMusicCommand(context: CommandContext) {
+    private fun handleMusicCommand(command: PrefixCommand, context: CommandContext) {
         val messageId = context.event.messageId
         val voiceChannel = context.event.member?.voiceState?.channel
         val guild = context.event.guild
 
-        setupMusicSyncHandlers(context, messageId)
+        val (_, isMentionPrefix) = determinePrefix(context.event)
+
+        if (isMentionPrefix) {
+            handleCommandResult(command.execute(context), context, command)
+            return
+        }
+
+        animalSync.onMap("play") { message ->
+            if (message["messageId"] as String == context.event.messageId) {
+                handleCommandResult(command.execute(context), context, command)
+            }
+        }?.let { subscriptions.add(it) }
+
+        animalSync.onMap("no_client") { message ->
+            if (message["messageId"] as String == context.event.messageId) {
+                context.event.channel.sendMessage(
+                    "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
+                ).queue()
+            }
+        }?.let { subscriptions.add(it) }
 
         try {
             animalSync.send(
@@ -132,24 +151,14 @@ object MessageHandler {
         }
     }
 
-    private fun setupMusicSyncHandlers(context: CommandContext, messageId: String) {
-        animalSync.onMap("play") { message ->
-            if (message["messageId"] as String == messageId) {
-                context.event.channel.sendMessage("✅ Đã thêm bài hát vào hàng đợi").queue()
-            }
-        }?.let { subscriptions.add(it) }
-
-        animalSync.onMap("no_client") { message ->
-            if (message["messageId"] as String == messageId) {
-                context.event.channel.sendMessage(
-                    "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
-                ).queue()
-            }
-        }?.let { subscriptions.add(it) }
-    }
-
     private fun handleCommandExecution(command: PrefixCommand, context: CommandContext) {
         val messageId = context.event.messageId
+        val (_, isMentionPrefix) = determinePrefix(context.event)
+
+        if (isMentionPrefix) {
+            handleCommandResult(command.execute(context), context, command)
+            return
+        }
 
         animalSync.onMap("command") { message ->
             if (message["messageId"] as String == messageId) {
