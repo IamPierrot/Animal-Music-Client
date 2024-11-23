@@ -2,7 +2,7 @@ FROM openjdk:17-jdk-slim
 
 WORKDIR /app
 
-COPY music.jar app.jar
+COPY out/artifacts/music_jar/music.jar app.jar
 
 ENV PREFIX="ish" \
     TOKEN="" \
