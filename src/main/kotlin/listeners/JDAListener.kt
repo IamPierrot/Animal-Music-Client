@@ -1,5 +1,6 @@
 package dev.pierrot.listeners
 
+import dev.pierrot.App
 import dev.pierrot.commands.core.CommandRegistry
 import dev.pierrot.commands.core.MessageHandler
 import dev.pierrot.getLogger
@@ -142,12 +143,14 @@ class JDAListener : ListenerAdapter() {
             )
         )
 
+
         try {
             animalSync.send(
                 "player_sync",
                 animalSync.clientId.toString(),
                 syncData
             )
+            App.ServiceLocator.musicManagerStrategy.removeMusicManager(event.guild.id)
         } catch (e: Exception) {
             logger.error("Failed to sync voice leave: {}", e.message)
         }

@@ -88,7 +88,7 @@ class AudioLoader(
     }
 
     override fun loadFailed(result: LoadFailed) {
-        event.message.reply("Failed to load track! " + result.exception.message)?.queue()
+        event.message.reply("Failed to load track! " + result.exception.message).queue()
         val syncData = PlayerSyncData().apply {
             eventExtend = "event"
             guildId = guildMusicManager.metadata?.asGuildMessageChannel()?.guild?.id ?: ""

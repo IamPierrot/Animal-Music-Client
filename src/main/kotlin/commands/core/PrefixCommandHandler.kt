@@ -1,6 +1,5 @@
 package dev.pierrot.commands.core
 
-import com.microsoft.signalr.Subscription
 import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.config
 import dev.pierrot.getLogger
@@ -10,17 +9,69 @@ import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import java.awt.Color
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 object MessageHandler {
     private val logger = getLogger("MessageHandler")
     private val animalSync = AnimalSync.getInstance()
-    private val subscriptions = ArrayList<Subscription>()
+    private val pendingCommands = ConcurrentHashMap<String, CommandContext>()
+    private val cleanupExecutor = Executors.newSingleThreadScheduledExecutor()
+
+    init {
+        setupPermanentSubscriptions()
+        setupCleanupTask()
+    }
+
+    private fun setupCleanupTask() {
+        cleanupExecutor.scheduleAtFixedRate({
+            val currentTime = System.currentTimeMillis()
+            pendingCommands.entries.removeIf { (_, context) ->
+                currentTime - context.timestamp > TimeUnit.MINUTES.toMillis(5)
+            }
+        }, 1, 1, TimeUnit.MINUTES)
+    }
+
+    private fun setupPermanentSubscriptions() {
+        animalSync.onMap("play") { message ->
+            val messageId = message["messageId"] as String
+            pendingCommands[messageId]?.let { context ->
+                val command = findCommand(context.commandName)
+                command?.let {
+                    handleCommandResult(it.execute(context), context, it)
+                }
+                pendingCommands.remove(messageId)
+            }
+        }
+
+        animalSync.onMap("no_client") { message ->
+            val messageId = message["messageId"] as String
+            pendingCommands[messageId]?.let { context ->
+                context.event.channel.sendMessage(
+                    "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
+                ).queue()
+                pendingCommands.remove(messageId)
+            }
+        }
+
+        animalSync.onMap("command") { message ->
+            val messageId = message["messageId"] as String
+            pendingCommands[messageId]?.let { context ->
+                val command = findCommand(context.commandName)
+                command?.let {
+                    handleCommandResult(it.execute(context), context, it)
+                }
+                pendingCommands.remove(messageId)
+            }
+        }
+    }
 
     fun handle(event: MessageReceivedEvent) {
         if (!shouldProcessMessage(event)) return
 
         val messageContext = createMessageContext(event) ?: return
-        val command = findCommand(messageContext) ?: run {
+        val command = findCommand(messageContext.commandName) ?: run {
             handleUnknownCommand(event, messageContext.isMentionPrefix)
             return
         }
@@ -28,20 +79,13 @@ object MessageHandler {
         processCommand(command, messageContext)
     }
 
-    private data class MessageContext(
-        val event: MessageReceivedEvent,
-        val prefix: String,
-        val isMentionPrefix: Boolean,
-        val commandName: String,
-        val args: List<String>,
-        val rawArgs: String
-    )
-
     private fun shouldProcessMessage(event: MessageReceivedEvent): Boolean {
         return !event.author.isBot
     }
 
-    private fun createMessageContext(event: MessageReceivedEvent): MessageContext? {
+
+
+    private fun createMessageContext(event: MessageReceivedEvent): CommandContext? {
         val (prefix, isMentionPrefix) = determinePrefix(event)
         val content = event.message.contentRaw
 
@@ -51,34 +95,72 @@ object MessageHandler {
         val args = withoutPrefix.split("\\s+".toRegex())
         if (args.isEmpty()) return null
 
-        return MessageContext(
+        return CommandContext(
             event = event,
             prefix = prefix,
             isMentionPrefix = isMentionPrefix,
             commandName = args[0].lowercase(),
             args = args.drop(1),
-            rawArgs = withoutPrefix.substringAfter(args[0]).trim()
+            rawArgs = withoutPrefix.substringAfter(args[0]).trim(),
+            timestamp = System.currentTimeMillis()
         )
     }
 
-    private fun findCommand(context: MessageContext): PrefixCommand? {
-        return CommandRegistry.getCommand(context.commandName)
+    private fun findCommand(commandName: String): PrefixCommand? {
+        return CommandRegistry.getCommand(commandName)
     }
 
-    private fun processCommand(command: PrefixCommand, messageContext: MessageContext) {
+    private fun processCommand(command: PrefixCommand, messageContext: CommandContext) {
         val context = CommandContext(
             event = messageContext.event,
             args = messageContext.args,
             rawArgs = messageContext.rawArgs,
             prefix = messageContext.prefix,
-            isMentionPrefix = messageContext.isMentionPrefix
+            isMentionPrefix = messageContext.isMentionPrefix,
+            commandName = messageContext.commandName,
+            timestamp = System.currentTimeMillis()
         )
 
         if (!validateVoiceRequirements(command, context)) return
 
-        handleCommandExecution(command, context).run {
-            subscriptions.forEach { it.unsubscribe() }
+        if (context.isMentionPrefix) {
+            handleCommandResult(command.execute(context), context, command)
+            return
         }
+
+        pendingCommands[context.event.messageId] = context
+
+        try {
+            if (command.commandConfig.category == "music") {
+                handleMusicCommand(command, context)
+            } else {
+                handleRegularCommand(command, context)
+            }
+        } catch (error: Exception) {
+            logger.warn("Failed to sync command: ${error.message}")
+            pendingCommands.remove(context.event.messageId)
+        }
+    }
+
+    private fun handleMusicCommand(command: PrefixCommand, context: CommandContext) {
+        animalSync.send(
+            "sync_play",
+            context.event.messageId,
+            context.event.member?.voiceState?.channel?.id,
+            context.event.guild.id,
+            context.event.channel.id,
+            context.args
+        )
+    }
+
+    private fun handleRegularCommand(command: PrefixCommand, context: CommandContext) {
+        animalSync.send(
+            "command_sync",
+            context.event.messageId,
+            context.event.guild.id,
+            context.event.channel.id,
+            context.event.member?.voiceState?.channel?.id
+        )
     }
 
     private fun validateVoiceRequirements(command: PrefixCommand, context: CommandContext): Boolean {
@@ -103,80 +185,9 @@ object MessageHandler {
             ) {
                 return false
             }
-
-            handleMusicCommand(command, context).run { subscriptions.forEach { it.unsubscribe() } }
-            return false
         }
 
         return true
-    }
-
-    private fun handleMusicCommand(command: PrefixCommand, context: CommandContext) {
-        val messageId = context.event.messageId
-        val voiceChannel = context.event.member?.voiceState?.channel
-        val guild = context.event.guild
-
-        val (_, isMentionPrefix) = determinePrefix(context.event)
-
-        if (isMentionPrefix) {
-            handleCommandResult(command.execute(context), context, command)
-            return
-        }
-
-        animalSync.onMap("play") { message ->
-            if (message["messageId"] as String == context.event.messageId) {
-                handleCommandResult(command.execute(context), context, command)
-            }
-        }?.let { subscriptions.add(it) }
-
-        animalSync.onMap("no_client") { message ->
-            if (message["messageId"] as String == context.event.messageId) {
-                context.event.channel.sendMessage(
-                    "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
-                ).queue()
-            }
-        }?.let { subscriptions.add(it) }
-
-        try {
-            animalSync.send(
-                "sync_play",
-                messageId,
-                voiceChannel?.id,
-                guild.id,
-                context.event.channel.id,
-                context.args
-            )
-        } catch (error: Exception) {
-            logger.warn("Failed to sync play command: ${error.message}")
-        }
-    }
-
-    private fun handleCommandExecution(command: PrefixCommand, context: CommandContext) {
-        val messageId = context.event.messageId
-        val (_, isMentionPrefix) = determinePrefix(context.event)
-
-        if (isMentionPrefix) {
-            handleCommandResult(command.execute(context), context, command)
-            return
-        }
-
-        animalSync.onMap("command") { message ->
-            if (message["messageId"] as String == messageId) {
-                handleCommandResult(command.execute(context), context, command)
-            }
-        }?.let { subscriptions.add(it) }
-
-        try {
-            animalSync.send(
-                "command_sync",
-                messageId,
-                context.event.guild.id,
-                context.event.channel.id,
-                context.event.member?.voiceState?.channel?.id
-            )
-        } catch (error: Exception) {
-            logger.warn("Failed to sync command: ${error.message}")
-        }
     }
 
     private fun determinePrefix(event: MessageReceivedEvent): Pair<String, Boolean> {
@@ -221,10 +232,8 @@ object MessageHandler {
                     result.remainingTime.toMillis()
                 )
             }
-
             CommandResult.InsufficientPermissions ->
                 sendErrorEmbed(context.event.message, "Bạn không đủ quyền dùng lệnh này!")
-
             CommandResult.InvalidArguments ->
                 sendErrorEmbed(
                     context.event.message,
