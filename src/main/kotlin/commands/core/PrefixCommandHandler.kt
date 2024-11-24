@@ -5,6 +5,7 @@ import dev.pierrot.config
 import dev.pierrot.getLogger
 import dev.pierrot.listeners.AnimalSync
 import dev.pierrot.tempReply
+import kotlinx.coroutines.*
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
@@ -18,6 +19,7 @@ object MessageHandler {
     private val animalSync = AnimalSync.getInstance()
     private val pendingCommands = ConcurrentHashMap<String, CommandContext>()
     private val cleanupExecutor = Executors.newSingleThreadScheduledExecutor()
+    private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     init {
         setupPermanentSubscriptions()
@@ -35,55 +37,60 @@ object MessageHandler {
 
     private fun setupPermanentSubscriptions() {
         animalSync.onMap("play") { message ->
+            if (message["connectionId"] != animalSync.clientConnectionId) return@onMap
             val messageId = message["messageId"] as String
-            pendingCommands[messageId]?.let { context ->
-                val command = findCommand(context.commandName)
-                command?.let {
-                    handleCommandResult(it.execute(context), context, it)
+            coroutineScope.launch {
+                pendingCommands[messageId]?.let { context ->
+                    val command = findCommand(context.commandName)
+                    command?.let {
+                        handleCommandResult(it.execute(context), context, it)
+                    }
+                    pendingCommands.remove(messageId)
                 }
-                pendingCommands.remove(messageId)
             }
         }
 
         animalSync.onMap("no_client") { message ->
+            if (message["connectionId"] != animalSync.clientConnectionId) return@onMap
             val messageId = message["messageId"] as String
-            pendingCommands[messageId]?.let { context ->
-                context.event.channel.sendMessage(
-                    "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
-                ).queue()
-                pendingCommands.remove(messageId)
+            coroutineScope.launch {
+                pendingCommands[messageId]?.let { context ->
+                    context.event.channel.sendMessage(
+                        "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
+                    ).queue()
+                    pendingCommands.remove(messageId)
+                }
             }
         }
 
         animalSync.onMap("command") { message ->
+            if (message["connectionId"] != animalSync.clientConnectionId) return@onMap
             val messageId = message["messageId"] as String
-            pendingCommands[messageId]?.let { context ->
-                val command = findCommand(context.commandName)
-                command?.let {
-                    handleCommandResult(it.execute(context), context, it)
+            coroutineScope.launch {
+                pendingCommands[messageId]?.let { context ->
+                    val command = findCommand(context.commandName)
+                    command?.let {
+                        handleCommandResult(it.execute(context), context, it)
+                    }
+                    pendingCommands.remove(messageId)
                 }
-                pendingCommands.remove(messageId)
             }
         }
     }
 
     fun handle(event: MessageReceivedEvent) {
-        if (!shouldProcessMessage(event)) return
+        if (event.author.isBot) return
 
-        val messageContext = createMessageContext(event) ?: return
-        val command = findCommand(messageContext.commandName) ?: run {
-            handleUnknownCommand(event, messageContext.isMentionPrefix)
-            return
+        coroutineScope.launch {
+            val messageContext = createMessageContext(event) ?: return@launch
+            val command = findCommand(messageContext.commandName) ?: run {
+                handleUnknownCommand(event, messageContext.isMentionPrefix)
+                return@launch
+            }
+
+            processCommand(command, messageContext)
         }
-
-        processCommand(command, messageContext)
     }
-
-    private fun shouldProcessMessage(event: MessageReceivedEvent): Boolean {
-        return !event.author.isBot
-    }
-
-
 
     private fun createMessageContext(event: MessageReceivedEvent): CommandContext? {
         val (prefix, isMentionPrefix) = determinePrefix(event)
@@ -110,7 +117,7 @@ object MessageHandler {
         return CommandRegistry.getCommand(commandName)
     }
 
-    private fun processCommand(command: PrefixCommand, messageContext: CommandContext) {
+    private suspend fun processCommand(command: PrefixCommand, messageContext: CommandContext) {
         val context = CommandContext(
             event = messageContext.event,
             args = messageContext.args,
@@ -131,10 +138,12 @@ object MessageHandler {
         pendingCommands[context.event.messageId] = context
 
         try {
-            if (command.commandConfig.category == "music") {
-                handleMusicCommand(command, context)
-            } else {
-                handleRegularCommand(command, context)
+            withContext(Dispatchers.IO) {
+                if (command.commandConfig.category == "music") {
+                    handleMusicCommand(command, context)
+                } else {
+                    handleRegularCommand(command, context)
+                }
             }
         } catch (error: Exception) {
             logger.warn("Failed to sync command: ${error.message}")
@@ -142,7 +151,7 @@ object MessageHandler {
         }
     }
 
-    private fun handleMusicCommand(command: PrefixCommand, context: CommandContext) {
+    private suspend fun handleMusicCommand(command: PrefixCommand, context: CommandContext) {
         animalSync.send(
             "sync_play",
             context.event.messageId,
@@ -153,7 +162,7 @@ object MessageHandler {
         )
     }
 
-    private fun handleRegularCommand(command: PrefixCommand, context: CommandContext) {
+    private suspend fun handleRegularCommand(command: PrefixCommand, context: CommandContext) {
         animalSync.send(
             "command_sync",
             context.event.messageId,

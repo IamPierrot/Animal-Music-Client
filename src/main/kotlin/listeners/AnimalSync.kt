@@ -15,6 +15,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 class AnimalSync private constructor(val clientId: Int) {
+    lateinit var clientConnectionId: String
+
     companion object {
         private val logger = getLogger("AnimalSync")
         private val HUB_URL = config.app.websocket
@@ -114,6 +116,7 @@ class AnimalSync private constructor(val clientId: Int) {
                         hubConnection.send(pendingEvent.method, *pendingEvent.args)
                         logger.info("Resent queued send event: ${pendingEvent.method}")
                     }
+
                     PendingEvent.EventType.INVOKE -> {
                         if (pendingEvent.returnType == null) {
                             logger.warn("Invoke event missing return type: ${pendingEvent.method}")
@@ -151,15 +154,18 @@ class AnimalSync private constructor(val clientId: Int) {
                         val handler = pendingSub.handler as (String) -> Unit
                         hubConnection.on(pendingSub.eventName, handler, String::class.java)
                     }
+
                     Map::class.java -> {
                         @Suppress("UNCHECKED_CAST")
                         val handler = pendingSub.handler as (Map<String, Any>) -> Unit
                         hubConnection.on(pendingSub.eventName, handler, Map::class.java as Class<Map<String, Any>>)
                     }
+
                     Any::class.java -> {
                         val handler = pendingSub.handler as (Any) -> Unit
                         hubConnection.on(pendingSub.eventName, handler, Any::class.java)
                     }
+
                     else -> {
                         logger.warn("Unsupported handler type for event: ${pendingSub.eventName}")
                         continue
@@ -174,7 +180,7 @@ class AnimalSync private constructor(val clientId: Int) {
 
     private fun setupBaseEventListeners() {
         onString("connection") { message ->
-            logger.info("Connection message: $message")
+            clientConnectionId = message
             retryAttempt.set(0)
             isReconnecting.set(false)
             processPendingSubscriptions()
