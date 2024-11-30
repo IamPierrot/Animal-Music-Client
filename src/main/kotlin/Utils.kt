@@ -37,7 +37,7 @@ fun getOrCreateMusicManager(guildId: String, metadata: MessageChannelUnion? = nu
 }
 
 @OptIn(DelicateCoroutinesApi::class)
-fun setTimeout(block: () -> Any, delayMillis: Long) {
+fun setTimeout(delayMillis: Long, block: () -> Any?) {
     try {
         GlobalScope.launch {
             delay(delayMillis)
@@ -98,9 +98,7 @@ fun tempReply(context: Message, message: Any, delayMillis: Long = 20000) {
         else -> throw IllegalArgumentException("Unsupported message type: Must be String or MessageEmbed")
     }
 
-    setTimeout({
-        sentMessage.delete().queue().runCatching {}
-    }, delayMillis)
+    setTimeout(delayMillis) { sentMessage.delete().queue().runCatching {} }
 }
 
 fun embed(): EmbedBuilder {

@@ -102,7 +102,6 @@ class AnimalSync private constructor(val clientId: Int) {
         val headers = hashMapOf("Secret" to "123")
         return HubConnectionBuilder.create("$HUB_URL?ClientId=$clientId")
             .withHeaders(headers)
-            .withServerTimeout(-1)
             .build()
     }
 

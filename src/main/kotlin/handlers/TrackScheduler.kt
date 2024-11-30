@@ -54,7 +54,7 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
             logger.error(e.message)
         }
         msg?.let {
-            setTimeout({ it.delete().queue() }, track.info.length)
+            setTimeout(track.info.length) { it.delete().queue() }
         }
     }
 

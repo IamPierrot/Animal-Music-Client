@@ -1,9 +1,9 @@
 package dev.pierrot.commands.core
 
-import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.config
 import dev.pierrot.getLogger
 import dev.pierrot.listeners.AnimalSync
+import dev.pierrot.setTimeout
 import dev.pierrot.tempReply
 import kotlinx.coroutines.*
 import net.dv8tion.jda.api.EmbedBuilder
@@ -39,43 +39,40 @@ object MessageHandler {
 
     private fun setupPermanentSubscriptions() {
         animalSync.onMap("play") { message ->
-            if (message["connectionId"] != animalSync.clientConnectionId) return@onMap
-            val messageId = message["messageId"] as String
-            coroutineScope.launch {
-                pendingCommands[messageId]?.let { context ->
-                    val command = findCommand(context.commandName)
-                    command?.let {
-                        handleCommandResult(it.execute(context), context, it)
-                    }
-                    pendingCommands.remove(messageId)
-                }
-            }
+            processMessage("play", message)
         }
 
         animalSync.onMap("no_client") { message ->
-            if (message["connectionId"] != animalSync.clientConnectionId) return@onMap
-            val messageId = message["messageId"] as String
-            coroutineScope.launch {
-                pendingCommands[messageId]?.let { context ->
-                    context.event.channel.sendMessage(
-                        "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
-                    ).queue()
-                    pendingCommands.remove(messageId)
-                }
-            }
+            processMessage("no_client", message)
         }
 
         animalSync.onMap("command") { message ->
-            if (message["connectionId"] != animalSync.clientConnectionId) return@onMap
-            val messageId = message["messageId"] as String
-            coroutineScope.launch {
-                pendingCommands[messageId]?.let { context ->
-                    val command = findCommand(context.commandName)
-                    command?.let {
-                        handleCommandResult(it.execute(context), context, it)
+            processMessage("command", message)
+        }
+    }
+
+    private fun processMessage(type: String, message: Map<String, Any>) {
+        val messageId = message["messageId"] as? String ?: return
+        if (message["connectionId"] != animalSync.clientConnectionId) return
+
+        coroutineScope.launch {
+            pendingCommands.computeIfPresent(messageId) { _, context ->
+                when (type) {
+                    "play" -> {
+                        findCommand(context.commandName)?.let { handleCommandResult(it.execute(context), context, it) }
                     }
-                    pendingCommands.remove(messageId)
+
+                    "no_client" -> {
+                        context.event.channel.sendMessage(
+                            "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
+                        ).queue()
+                    }
+
+                    "command" -> {
+                        findCommand(context.commandName)?.let { handleCommandResult(it.execute(context), context, it) }
+                    }
                 }
+                null
             }
         }
     }
@@ -119,17 +116,7 @@ object MessageHandler {
         return CommandRegistry.getCommand(commandName)
     }
 
-    private suspend fun processCommand(command: PrefixCommand, messageContext: CommandContext) {
-        val context = CommandContext(
-            event = messageContext.event,
-            args = messageContext.args,
-            rawArgs = messageContext.rawArgs,
-            prefix = messageContext.prefix,
-            isMentionPrefix = messageContext.isMentionPrefix,
-            commandName = messageContext.commandName,
-            timestamp = System.currentTimeMillis()
-        )
-
+    private suspend fun processCommand(command: PrefixCommand, context: CommandContext) {
         if (!validateVoiceRequirements(command, context)) return
 
         if (context.isMentionPrefix) {
@@ -139,21 +126,26 @@ object MessageHandler {
 
         pendingCommands[context.event.messageId] = context
 
-        try {
-            withContext(Dispatchers.IO) {
-                if (command.commandConfig.category == "music") {
-                    handleMusicCommand(command, context)
-                } else {
-                    handleRegularCommand(command, context)
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                withTimeout(10000) {
+                    if (command.commandConfig.category == "music") {
+                        handleMusicCommand(context)
+                    } else {
+                        handleRegularCommand(context)
+                    }
                 }
+            } catch (e: TimeoutCancellationException) {
+                logger.warn("Command timed out: ${context.commandName}")
+            } catch (e: Exception) {
+                logger.error("Error processing command: ${e.message}", e)
+            } finally {
+                setTimeout(5000) { pendingCommands.remove(context.event.messageId) }
             }
-        } catch (error: Exception) {
-            logger.warn("Failed to sync command: ${error.message}")
-            pendingCommands.remove(context.event.messageId)
         }
     }
 
-    private suspend fun handleMusicCommand(command: PrefixCommand, context: CommandContext) {
+    private suspend fun handleMusicCommand(context: CommandContext) {
         animalSync.send(
             "sync_play",
             context.event.messageId,
@@ -164,7 +156,7 @@ object MessageHandler {
         )
     }
 
-    private suspend fun handleRegularCommand(command: PrefixCommand, context: CommandContext) {
+    private suspend fun handleRegularCommand(context: CommandContext) {
         animalSync.send(
             "command_sync",
             context.event.messageId,
@@ -230,14 +222,16 @@ object MessageHandler {
             is CommandResult.Error -> sendErrorEmbed(context.event.message, result.message)
             is CommandResult.CooldownActive -> {
                 val timeStamp = "<t:${System.currentTimeMillis() / 1000 + result.remainingTime.seconds}:R>"
-                sendErrorEmbed(
+                tempReply(
                     context.event.message,
                     "Hãy đợi $timeStamp để sử dụng lệnh.",
                     result.remainingTime.toMillis()
                 )
             }
+
             CommandResult.InsufficientPermissions ->
                 sendErrorEmbed(context.event.message, "Bạn không đủ quyền dùng lệnh này!")
+
             CommandResult.InvalidArguments ->
                 sendErrorEmbed(
                     context.event.message,
