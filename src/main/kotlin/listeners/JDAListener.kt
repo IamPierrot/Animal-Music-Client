@@ -88,12 +88,12 @@ class JDAListener : ListenerAdapter() {
 
     override fun onGuildJoin(event: GuildJoinEvent) {
         val guilds = event.jda.guilds.map { it.id }
-        animalSync.send("GuildSync", animalSync.clientId.toString(), guilds)
+        animalSync.send("guild_sync", animalSync.clientId.toString(), guilds)
     }
 
     override fun onGuildLeave(event: GuildLeaveEvent) {
         val guilds = event.jda.guilds.map { it.id }
-        animalSync.send("GuildSync", animalSync.clientId.toString(), guilds)
+        animalSync.send("guild_sync", animalSync.clientId.toString(), guilds)
     }
 
     override fun onMessageReceived(event: MessageReceivedEvent) {
