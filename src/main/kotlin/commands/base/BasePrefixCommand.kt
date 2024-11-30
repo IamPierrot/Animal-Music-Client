@@ -35,6 +35,11 @@ abstract class BasePrefixCommand : PrefixCommand {
             return CommandResult.CooldownActive(remainingCooldown)
         }
 
+        val memberVoiceState = context.event.member?.voiceState
+        if (memberVoiceState?.channel == null) {
+            return CommandResult.Error("❌ | Bạn cần vào voice để thực hiện lệnh này!")
+        }
+
         return try {
             executeCommand(context).also { result ->
                 if (result is CommandResult.Success) {

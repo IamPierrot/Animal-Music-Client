@@ -30,7 +30,7 @@ class App private constructor() {
                 .setVoiceDispatchInterceptor(JDAVoiceUpdateListener(lavalinkClient))
                 .enableIntents(GatewayIntent.GUILD_VOICE_STATES)
                 .enableIntents(GatewayIntent.MESSAGE_CONTENT)
-                .enableCache(CacheFlag.VOICE_STATE)
+                .enableIntents(GatewayIntent.GUILD_MESSAGES)
                 .addEventListeners(JDAListener())
                 .build()
                 .awaitReady()

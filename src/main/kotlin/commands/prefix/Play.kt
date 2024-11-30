@@ -1,6 +1,5 @@
 package dev.pierrot.commands.prefix
 
-import com.microsoft.signalr.Subscription
 import dev.pierrot.App
 import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.commands.config.CommandConfig
@@ -12,8 +11,6 @@ import dev.pierrot.handlers.AudioLoader
 import dev.pierrot.joinHelper
 import net.dv8tion.jda.api.Permission
 import java.time.Duration
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.TimeUnit
 
 class Play : BasePrefixCommand() {
     override val name: String = "play"
@@ -38,7 +35,9 @@ class Play : BasePrefixCommand() {
             val guildId = context.event.guild.id
 
             val voiceChannelId = context.event.member?.voiceState?.id
-            joinHelper(context.event)
+            context.event.guild.selfMember.voiceState?.let {
+                if (!it.inAudioChannel()) joinHelper(context.event)
+            }
 
             val identifier = context.args.joinToString(" ")
             val query = if (identifier.startsWith("https")) identifier else "ytsearch:$identifier"

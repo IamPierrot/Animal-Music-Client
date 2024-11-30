@@ -99,7 +99,7 @@ fun tempReply(context: Message, message: Any, delayMillis: Long = 20000) {
     }
 
     setTimeout({
-        sentMessage.delete().queue()
+        sentMessage.delete().queue().runCatching {}
     }, delayMillis)
 }
 

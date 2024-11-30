@@ -57,6 +57,10 @@ class JDAListener : ListenerAdapter() {
         }
     }
 
+    init {
+        MessageHandler.apply {  }
+    }
+
 
     override fun onButtonInteraction(event: ButtonInteractionEvent) {
         val buttonId = event.componentId

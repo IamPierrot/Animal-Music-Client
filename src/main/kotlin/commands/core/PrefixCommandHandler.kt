@@ -28,9 +28,11 @@ object MessageHandler {
 
     private fun setupCleanupTask() {
         cleanupExecutor.scheduleAtFixedRate({
-            val currentTime = System.currentTimeMillis()
-            pendingCommands.entries.removeIf { (_, context) ->
-                currentTime - context.timestamp > TimeUnit.MINUTES.toMillis(5)
+            synchronized(pendingCommands) {
+                val currentTime = System.currentTimeMillis()
+                pendingCommands.entries.removeIf { (_, context) ->
+                    currentTime - context.timestamp > TimeUnit.MINUTES.toMillis(5)
+                }
             }
         }, 1, 1, TimeUnit.MINUTES)
     }
@@ -179,18 +181,11 @@ object MessageHandler {
         if (!needsVoice) return true
 
         val memberVoiceState = context.event.member?.voiceState
-        if (memberVoiceState?.channel == null) {
-            sendErrorEmbed(
-                context.event.message,
-                "❌ | Bạn cần vào voice để thực hiện lệnh này!"
-            )
-            return false
-        }
 
         if (command.commandConfig.category == "music") {
             val selfVoiceState = context.event.guild.selfMember.voiceState
             if (selfVoiceState?.channel?.id != null &&
-                memberVoiceState.channel?.id != selfVoiceState.channel?.id
+                memberVoiceState?.channel?.id != selfVoiceState.channel?.id
             ) {
                 return false
             }
@@ -246,14 +241,14 @@ object MessageHandler {
             CommandResult.InvalidArguments ->
                 sendErrorEmbed(
                     context.event.message,
-                    "Sai cách dùng lệnh, cách dùng đúng: ${(prefixCommand as? BasePrefixCommand)?.commandConfig?.usage}"
+                    "Sai cách dùng lệnh, cách dùng đúng: ${prefixCommand.commandConfig.usage}"
                 )
         }
     }
 
     private fun sendErrorEmbed(message: Message, error: String, delay: Long = 20000) {
         val embed = EmbedBuilder()
-            .setDescription("❌ | Có lỗi xảy ra: \n```\n${error.take(error.length / 2)}\n```")
+            .setDescription("❌ | Có lỗi xảy ra: \n```\n${error.take(2000)}\n```")
             .setColor(Color.RED)
             .build()
 
