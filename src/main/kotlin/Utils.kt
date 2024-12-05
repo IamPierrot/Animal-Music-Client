@@ -11,6 +11,8 @@ import net.dv8tion.jda.api.entities.GuildVoiceState
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.entities.MessageEmbed
 import net.dv8tion.jda.api.entities.channel.unions.MessageChannelUnion
+import net.dv8tion.jda.api.events.interaction.GenericInteractionCreateEvent
+import net.dv8tion.jda.api.events.interaction.component.GenericComponentInteractionCreateEvent
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -99,6 +101,16 @@ fun tempReply(context: Message, message: Any, delayMillis: Long = 20000) {
     }
 
     setTimeout(delayMillis) { sentMessage.delete().queue().runCatching {} }
+}
+
+fun tempReply(context: GenericComponentInteractionCreateEvent, message: Any, delayMillis: Long = 20000) {
+    val sentMessage = when (message) {
+        is String -> context.reply(message).setEphemeral(true).complete()
+        is MessageEmbed -> context.replyEmbeds(message).setEphemeral(true).complete()
+        else -> throw IllegalArgumentException("Unsupported message type: Must be String or MessageEmbed")
+    }
+
+    setTimeout(delayMillis) { sentMessage.deleteOriginal().queue().runCatching {} }
 }
 
 fun embed(): EmbedBuilder {

@@ -3,6 +3,7 @@ package dev.pierrot.listeners
 import dev.pierrot.App
 import dev.pierrot.commands.core.CommandRegistry
 import dev.pierrot.commands.core.MessageHandler
+import dev.pierrot.components.base.ComponentRegistry
 import dev.pierrot.getLogger
 import dev.pierrot.models.PlayerEvent
 import dev.pierrot.models.PlayerSyncData
@@ -10,6 +11,7 @@ import net.dv8tion.jda.api.events.guild.GuildJoinEvent
 import net.dv8tion.jda.api.events.guild.GuildLeaveEvent
 import net.dv8tion.jda.api.events.guild.voice.GuildVoiceUpdateEvent
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent
+import net.dv8tion.jda.api.events.interaction.component.GenericComponentInteractionCreateEvent
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import net.dv8tion.jda.api.events.session.ReadyEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
@@ -59,8 +61,13 @@ class JDAListener : ListenerAdapter() {
 
     init {
         MessageHandler.apply {  }
+        ComponentRegistry.instance.apply {  }
     }
 
+    override fun onGenericComponentInteractionCreate(event: GenericComponentInteractionCreateEvent) {
+        logger.info(event.componentId)
+        ComponentRegistry.instance.onHandleComponent(event)
+    }
 
     override fun onButtonInteraction(event: ButtonInteractionEvent) {
         val buttonId = event.componentId

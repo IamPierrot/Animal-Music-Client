@@ -63,7 +63,7 @@ object CommandRegistry {
         reflections.getSubTypesOf(BasePrefixCommand::class.java)
             .forEach { commandClass ->
                 try {
-                    registerCommand(commandClass.getConstructor().newInstance())
+                    registerCommand(commandClass.getDeclaredConstructor().newInstance())
                 } catch (e: Exception) {
                     logger.error("Failed to register command: ${commandClass.simpleName}", e)
                 }

@@ -24,22 +24,8 @@ class Loop : BasePrefixCommand() {
             return CommandResult.Success
         }
 
+        guildMusicManager.scheduler.changeLoopMode(loopMode)
 
-        when (loopMode) {
-            0 -> {
-                guildMusicManager.scheduler.setLoopMode(LoopMode.TRACK)
-            }
-
-            1 -> {
-                guildMusicManager.scheduler.setLoopMode(LoopMode.QUEUE)
-            }
-
-            2 -> {
-                guildMusicManager.scheduler.setLoopMode(LoopMode.NONE)
-            }
-
-            else -> {}
-        }
         val loopEmbed = embed()
             .setColor(Color.pink)
             .setDescription("Thiết lập chế độ : **${methods[loopMode]}** ✅")

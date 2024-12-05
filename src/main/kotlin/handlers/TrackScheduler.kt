@@ -179,6 +179,22 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
         this.loopMode = loopMode
     }
 
+    @Synchronized
+    fun changeLoopMode(loopMode: Int) {
+        when (loopMode) {
+            0 -> {
+                guildMusicManager.scheduler.setLoopMode(LoopMode.TRACK)
+            }
+            1 -> {
+                guildMusicManager.scheduler.setLoopMode(LoopMode.QUEUE)
+            }
+            2 -> {
+                guildMusicManager.scheduler.setLoopMode(LoopMode.NONE)
+            }
+            else -> {}
+        }
+    }
+
     private fun trackEmbed(track: Track): MessageEmbed {
         val trackInfo = track.info
         val lengthInMillis = trackInfo.length
