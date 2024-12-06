@@ -21,34 +21,19 @@ object MessageHandler {
     private val cleanupExecutor = Executors.newSingleThreadScheduledExecutor()
     private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    init {
-        setupPermanentSubscriptions()
-        setupCleanupTask()
-    }
-
-    private fun setupCleanupTask() {
+    fun setupCleanupTask() {
         cleanupExecutor.scheduleAtFixedRate({
-            synchronized(pendingCommands) {
-                val currentTime = System.currentTimeMillis()
-                pendingCommands.entries.removeIf { (_, context) ->
-                    currentTime - context.timestamp > TimeUnit.MINUTES.toMillis(5)
-                }
+            val currentTime = System.currentTimeMillis()
+            pendingCommands.entries.removeIf { (_, context) ->
+                currentTime - context.timestamp > TimeUnit.MINUTES.toMillis(5)
             }
         }, 1, 1, TimeUnit.MINUTES)
     }
 
-    private fun setupPermanentSubscriptions() {
-        animalSync.onMap("play") { message ->
-            processMessage("play", message)
-        }
-
-        animalSync.onMap("no_client") { message ->
-            processMessage("no_client", message)
-        }
-
-        animalSync.onMap("command") { message ->
-            processMessage("command", message)
-        }
+    fun setupPermanentSubscriptions() {
+        animalSync.onMap("play") { message -> processMessage("play", message) }
+        animalSync.onMap("no_client") { message -> processMessage("no_client", message) }
+        animalSync.onMap("command") { message -> processMessage("command", message) }
     }
 
     private fun processMessage(type: String, message: Map<String, Any>) {
@@ -56,10 +41,12 @@ object MessageHandler {
         if (message["connectionId"] != animalSync.clientConnectionId) return
 
         coroutineScope.launch {
-            pendingCommands.computeIfPresent(messageId) { _, context ->
+            pendingCommands.remove(messageId)?.let { context ->
                 when (type) {
-                    "play" -> {
-                        findCommand(context.commandName)?.let { handleCommandResult(it.execute(context), context, it) }
+                    "play", "command" -> {
+                        findCommand(context.commandName)?.let { command ->
+                            handleCommandResult(command.execute(context), context, command)
+                        }
                     }
 
                     "no_client" -> {
@@ -67,12 +54,7 @@ object MessageHandler {
                             "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
                         ).queue()
                     }
-
-                    "command" -> {
-                        findCommand(context.commandName)?.let { handleCommandResult(it.execute(context), context, it) }
-                    }
                 }
-                null
             }
         }
     }
@@ -81,21 +63,20 @@ object MessageHandler {
         if (event.author.isBot) return
 
         coroutineScope.launch {
-            val messageContext = createMessageContext(event) ?: return@launch
-            val command = findCommand(messageContext.commandName) ?: run {
-                handleUnknownCommand(event, messageContext.isMentionPrefix)
+            val context = createMessageContext(event) ?: return@launch
+            val command = findCommand(context.commandName) ?: run {
+                handleUnknownCommand(event, context.isMentionPrefix)
                 return@launch
             }
 
-            processCommand(command, messageContext)
+            processCommand(command, context)
         }
     }
 
     private fun createMessageContext(event: MessageReceivedEvent): CommandContext? {
         val (prefix, isMentionPrefix) = determinePrefix(event)
         val content = event.message.contentRaw
-
-        if (!content.lowercase().startsWith(prefix.lowercase())) return null
+        if (!content.startsWith(prefix, ignoreCase = true)) return null
 
         val withoutPrefix = content.substring(prefix.length).trim()
         val args = withoutPrefix.split("\\s+".toRegex())
@@ -117,35 +98,33 @@ object MessageHandler {
     }
 
     private suspend fun processCommand(command: PrefixCommand, context: CommandContext) {
-        if (!validateVoiceRequirements(command, context)) return
-
-        if (context.isMentionPrefix) {
-            handleCommandResult(command.execute(context), context, command)
+        if (!validateVoiceRequirements(command, context)) {
+            tempReply(context.event.message, "❌ | Bạn cần ở trong voice channel để sử dụng lệnh này.")
             return
         }
 
         pendingCommands[context.event.messageId] = context
 
-        coroutineScope.launch(Dispatchers.IO) {
-            try {
-                withTimeout(10000) {
-                    if (command.commandConfig.category == "music") {
-                        handleMusicCommand(context)
-                    } else {
-                        handleRegularCommand(context)
-                    }
+        try {
+            withTimeout(10_000) {
+                if (command.commandConfig.category.equals("music", ignoreCase = true)) {
+                    handleMusicCommand(context)
+                } else {
+                    handleRegularCommand(context)
                 }
-            } catch (e: TimeoutCancellationException) {
-                logger.warn("Command timed out: ${context.commandName}")
-            } catch (e: Exception) {
-                logger.error("Error processing command: ${e.message}", e)
-            } finally {
-                setTimeout(5000) { pendingCommands.remove(context.event.messageId) }
             }
+        } catch (e: TimeoutCancellationException) {
+            logger.warn("Command timed out: ${context.commandName}")
+            tempReply(context.event.message, "⏳ | Lệnh thực thi quá lâu, vui lòng thử lại.")
+        } catch (e: Exception) {
+            logger.error("Error processing command: ", e)
+            tempReply(context.event.message, "❌ | Đã xảy ra lỗi: ${e.message}")
+        } finally {
+            setTimeout(10_000) { pendingCommands.remove(context.event.messageId) }
         }
     }
 
-    private suspend fun handleMusicCommand(context: CommandContext) {
+    private fun handleMusicCommand(context: CommandContext) {
         animalSync.send(
             "sync_play",
             context.event.messageId,
@@ -156,7 +135,7 @@ object MessageHandler {
         )
     }
 
-    private suspend fun handleRegularCommand(context: CommandContext) {
+    private fun handleRegularCommand(context: CommandContext) {
         animalSync.send(
             "command_sync",
             context.event.messageId,
@@ -168,31 +147,25 @@ object MessageHandler {
 
     private fun validateVoiceRequirements(command: PrefixCommand, context: CommandContext): Boolean {
         val needsVoice = command.commandConfig.voiceChannel ||
-                command.commandConfig.category.lowercase() == "music"
-
-        if (!needsVoice) return true
+                command.commandConfig.category.equals("music", ignoreCase = true)
 
         val memberVoiceState = context.event.member?.voiceState
+        val selfVoiceState = context.event.guild.selfMember.voiceState
 
-        if (command.commandConfig.category == "music") {
-            val selfVoiceState = context.event.guild.selfMember.voiceState
-            if (selfVoiceState?.channel?.id != null &&
-                memberVoiceState?.channel?.id != selfVoiceState.channel?.id
-            ) {
-                return false
-            }
+        return when {
+            !needsVoice -> true
+            memberVoiceState?.channel == null -> false
+            command.commandConfig.category.equals("music", ignoreCase = true) &&
+                    selfVoiceState?.channel != null &&
+                    memberVoiceState.channel?.id != selfVoiceState.channel?.id -> false
+
+            else -> true
         }
-
-        return true
     }
 
     private fun determinePrefix(event: MessageReceivedEvent): Pair<String, Boolean> {
-        event.message.mentions.users.firstOrNull()?.let { mention ->
-            if (mention.id == event.jda.selfUser.id) {
-                return mention.asMention to true
-            }
-        }
-        return config.app.prefix to false
+        val mention = event.message.mentions.users.firstOrNull { it.id == event.jda.selfUser.id }
+        return if (mention != null) mention.asMention to true else config.app.prefix to false
     }
 
     private fun handleUnknownCommand(event: MessageReceivedEvent, isMentionPrefix: Boolean) {
@@ -215,32 +188,29 @@ object MessageHandler {
     private fun handleCommandResult(
         result: CommandResult,
         context: CommandContext,
-        prefixCommand: PrefixCommand
+        command: PrefixCommand
     ) {
         when (result) {
-            is CommandResult.Success -> {}
+            is CommandResult.Success -> Unit
             is CommandResult.Error -> sendErrorEmbed(context.event.message, result.message)
             is CommandResult.CooldownActive -> {
-                val timeStamp = "<t:${System.currentTimeMillis() / 1000 + result.remainingTime.seconds}:R>"
-                tempReply(
-                    context.event.message,
-                    "Hãy đợi $timeStamp để sử dụng lệnh.",
-                    result.remainingTime.toMillis()
-                )
+                val timeStamp = "<t:${(System.currentTimeMillis() / 1000 + result.remainingTime.seconds).toInt()}:R>"
+                tempReply(context.event.message, "⏳ | Hãy đợi $timeStamp để sử dụng lệnh.", result.remainingTime.toMillis())
             }
 
-            CommandResult.InsufficientPermissions ->
-                sendErrorEmbed(context.event.message, "Bạn không đủ quyền dùng lệnh này!")
+            CommandResult.InsufficientPermissions -> sendErrorEmbed(
+                context.event.message,
+                "Bạn không đủ quyền dùng lệnh này!"
+            )
 
-            CommandResult.InvalidArguments ->
-                sendErrorEmbed(
-                    context.event.message,
-                    "Sai cách dùng lệnh, cách dùng đúng: ${prefixCommand.commandConfig.usage}"
-                )
+            CommandResult.InvalidArguments -> tempReply(
+                context.event.message,
+                "Sai cách dùng lệnh, cách dùng đúng: ${command.commandConfig.usage}"
+            )
         }
     }
 
-    private fun sendErrorEmbed(message: Message, error: String, delay: Long = 20000) {
+    private fun sendErrorEmbed(message: Message, error: String, delay: Long = 20_000) {
         val embed = EmbedBuilder()
             .setDescription("❌ | Có lỗi xảy ra: \n```\n${error.take(2000)}\n```")
             .setColor(Color.RED)

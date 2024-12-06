@@ -60,7 +60,8 @@ class JDAListener : ListenerAdapter() {
     }
 
     init {
-        MessageHandler.apply {  }
+        MessageHandler.setupPermanentSubscriptions()
+        MessageHandler.setupCleanupTask()
         ComponentRegistry.instance.apply {  }
     }
 

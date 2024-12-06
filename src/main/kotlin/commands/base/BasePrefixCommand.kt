@@ -22,36 +22,35 @@ abstract class BasePrefixCommand : PrefixCommand {
     private val cooldownManager = CooldownManager()
 
     final override fun execute(context: CommandContext): CommandResult {
-        // Check permissions
-        val permissionResult = checkPermissions(context)
-        if (permissionResult != CommandResult.Success) {
-            return permissionResult
-        }
+        try {
+            // Check permissions
+            val permissionResult = checkPermissions(context)
+            if (permissionResult != CommandResult.Success) {
+                return permissionResult
+            }
 
-        // Check cooldown
-        val cooldownKey = cooldownScope.getKey(context)
-        val remainingCooldown = cooldownManager.getRemainingCooldown(cooldownKey)
-        if (remainingCooldown > Duration.ZERO) {
-            return CommandResult.CooldownActive(remainingCooldown)
-        }
+            // Check cooldown
+            val cooldownKey = cooldownScope.getKey(context)
+            val remainingCooldown = cooldownManager.getRemainingCooldown(cooldownKey)
+            if (remainingCooldown > Duration.ZERO) return CommandResult.CooldownActive(remainingCooldown)
 
-        val memberVoiceState = context.event.member?.voiceState
-        if (memberVoiceState?.channel == null) {
-            return CommandResult.Error("❌ | Bạn cần vào voice để thực hiện lệnh này!")
-        }
+            // Check voice state if required
+            val memberVoiceState = context.event.member?.voiceState
+            if (memberVoiceState?.channel == null)
+                return CommandResult.Error("❌ | Bạn cần vào voice channel để thực hiện lệnh này!")
 
-        return try {
-            executeCommand(context).also { result ->
+            // Execute command logic
+            return executeCommand(context).also { result ->
                 if (result is CommandResult.Success) {
                     cooldownManager.applyCooldown(cooldownKey, commandConfig.cooldown)
-                    if (commandConfig.deleteCommandMessage) {
-                        context.event.message.delete().queue()
+                    if (commandConfig.deleteCommandMessage) context.event.message.delete().queue(null) { error ->
+                        logger.warn("Không thể xóa tin nhắn: ${error.message}")
                     }
                 }
             }
         } catch (e: Exception) {
-            logger.error("Error executing command: ", e)
-            CommandResult.Error(e.message ?: "Unknown error occurred")
+            logger.error("Lỗi khi thực thi lệnh: ", e)
+            return CommandResult.Error("❌ | Đã xảy ra lỗi khi thực hiện lệnh: ${e.message}")
         }
     }
 
@@ -62,20 +61,22 @@ abstract class BasePrefixCommand : PrefixCommand {
         val member = context.event.member ?: return CommandResult.InsufficientPermissions
         val selfMember = guild.selfMember
 
+        // Check bot permissions
         val missingBotPermissions = commandConfig.requireBotPermissions.filter { !selfMember.hasPermission(it) }
         if (missingBotPermissions.isNotEmpty()) {
             tempReply(
                 context.event.message,
-                "❌ | Bot thiếu những quyền sau ${missingBotPermissions.joinToString(" ") { "`$it`" }}"
+                "❌ | Bot thiếu những quyền sau: ${missingBotPermissions.joinToString(" ") { "`$it`" }}."
             )
             return CommandResult.InsufficientPermissions
         }
 
+        // Check user permissions
         val missingUserPermissions = commandConfig.requireUserPermissions.filter { !member.hasPermission(it) }
         if (missingUserPermissions.isNotEmpty()) {
             tempReply(
                 context.event.message,
-                "❌ | Bạn thiếu những quyền sau ${missingUserPermissions.joinToString(" ") { "`$it`" }}"
+                "❌ | Bạn thiếu những quyền sau: ${missingUserPermissions.joinToString(" ") { "`$it`" }}."
             )
             return CommandResult.InsufficientPermissions
         }
