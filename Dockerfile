@@ -1,24 +1,21 @@
-FROM openjdk:17-jdk-slim
+FROM openjdk:17-jdk-alpine
 
 WORKDIR /app
 
 COPY out/artifacts/music_jar/music.jar app.jar
 
-RUN apt-get update && apt-get install -y \
-    libfreetype6 \
+RUN apk add --no-cache \
     fontconfig \
-    libxrender1 \
-    libxext6 \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    ttf-dejavu \
+    libxrender \
+    libxext && \
+    apk add --no-cache zip && \
+    zip -d app.jar 'META-INF/*.SF' 'META-INF/*.RSA'
 
 ENV PREFIX="ish" \
     TOKEN="" \
     LAVALINK="http://localhost:8080" \
     WEBSOCKET="ws://localhost:5034/animal" \
     CLIENT_ID="1"
-
-RUN apt-get update && apt-get install -y zip && \
-    zip -d app.jar 'META-INF/*.SF' 'META-INF/*.RSA' && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 CMD ["java", "-jar", "app.jar"]

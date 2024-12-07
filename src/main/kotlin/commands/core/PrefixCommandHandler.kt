@@ -44,9 +44,7 @@ object MessageHandler {
             pendingCommands.remove(messageId)?.let { context ->
                 when (type) {
                     "play", "command" -> {
-                        findCommand(context.commandName)?.let { command ->
-                            handleCommandResult(command.execute(context), context, command)
-                        }
+                        handleCommandResult(context.command.execute(context), context, context.command)
                     }
 
                     "no_client" -> {
@@ -64,12 +62,8 @@ object MessageHandler {
 
         coroutineScope.launch {
             val context = createMessageContext(event) ?: return@launch
-            val command = findCommand(context.commandName) ?: run {
-                handleUnknownCommand(event, context.isMentionPrefix)
-                return@launch
-            }
 
-            processCommand(command, context)
+            processCommand(context.command, context)
         }
     }
 
@@ -81,12 +75,18 @@ object MessageHandler {
         val withoutPrefix = content.substring(prefix.length).trim()
         val args = withoutPrefix.split("\\s+".toRegex())
         if (args.isEmpty()) return null
+        val commandName = args[0].lowercase()
+
+        val command = findCommand(commandName) ?: run {
+            handleUnknownCommand(event, isMentionPrefix)
+            return null
+        }
 
         return CommandContext(
             event = event,
             prefix = prefix,
             isMentionPrefix = isMentionPrefix,
-            commandName = args[0].lowercase(),
+            command = command,
             args = args.drop(1),
             rawArgs = withoutPrefix.substringAfter(args[0]).trim(),
             timestamp = System.currentTimeMillis()
@@ -97,11 +97,8 @@ object MessageHandler {
         return CommandRegistry.getCommand(commandName)
     }
 
-    private suspend fun processCommand(command: PrefixCommand, context: CommandContext) {
-        if (!validateVoiceRequirements(command, context)) {
-            tempReply(context.event.message, "❌ | Bạn cần ở trong voice channel để sử dụng lệnh này.")
-            return
-        }
+    private fun processCommand(command: PrefixCommand, context: CommandContext) = runBlocking {
+        if (!validateVoiceRequirements(command, context)) return@runBlocking
 
         pendingCommands[context.event.messageId] = context
 
@@ -114,7 +111,7 @@ object MessageHandler {
                 }
             }
         } catch (e: TimeoutCancellationException) {
-            logger.warn("Command timed out: ${context.commandName}")
+            logger.warn("Command timed out: ${context.command}")
             tempReply(context.event.message, "⏳ | Lệnh thực thi quá lâu, vui lòng thử lại.")
         } catch (e: Exception) {
             logger.error("Error processing command: ", e)
@@ -124,7 +121,7 @@ object MessageHandler {
         }
     }
 
-    private fun handleMusicCommand(context: CommandContext) {
+    private fun handleMusicCommand(context: CommandContext) = runBlocking {
         animalSync.send(
             "sync_play",
             context.event.messageId,
@@ -135,7 +132,7 @@ object MessageHandler {
         )
     }
 
-    private fun handleRegularCommand(context: CommandContext) {
+    private fun handleRegularCommand(context: CommandContext) = runBlocking {
         animalSync.send(
             "command_sync",
             context.event.messageId,
@@ -154,7 +151,10 @@ object MessageHandler {
 
         return when {
             !needsVoice -> true
-            memberVoiceState?.channel == null -> false
+            memberVoiceState?.channel == null -> {
+                tempReply(context.event.message, "❌ | Bạn cần ở trong voice channel để sử dụng lệnh này.")
+                return false
+            }
             command.commandConfig.category.equals("music", ignoreCase = true) &&
                     selfVoiceState?.channel != null &&
                     memberVoiceState.channel?.id != selfVoiceState.channel?.id -> false
@@ -194,15 +194,15 @@ object MessageHandler {
             is CommandResult.Success -> Unit
             is CommandResult.Error -> sendErrorEmbed(context.event.message, result.message)
             is CommandResult.CooldownActive -> {
-                val timeStamp = "<t:${(System.currentTimeMillis() / 1000 + result.remainingTime.seconds).toInt()}:R>"
-                tempReply(context.event.message, "⏳ | Hãy đợi $timeStamp để sử dụng lệnh.", result.remainingTime.toMillis())
+                val timeStamp = "<t:${(result.remainingTime.toMillis()).toInt()}:R>"
+                tempReply(
+                    context.event.message,
+                    "⏳ | Hãy đợi $timeStamp để sử dụng lệnh.",
+                    result.remainingTime.toMillis()
+                )
             }
 
-            CommandResult.InsufficientPermissions -> sendErrorEmbed(
-                context.event.message,
-                "Bạn không đủ quyền dùng lệnh này!"
-            )
-
+            CommandResult.InsufficientPermissions -> Unit
             CommandResult.InvalidArguments -> tempReply(
                 context.event.message,
                 "Sai cách dùng lệnh, cách dùng đúng: ${command.commandConfig.usage}"

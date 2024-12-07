@@ -307,7 +307,7 @@ class AnimalSync private constructor(val clientId: Int) {
         subscriptions.remove(eventName)
     }
 
-    fun offAll() {
+    private fun offAll() {
         subscriptions.forEach { (_, subs) ->
             subs.forEach { it.unsubscribe() }
         }

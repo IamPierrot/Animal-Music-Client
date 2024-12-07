@@ -1,6 +1,5 @@
 package dev.pierrot.commands.core
 
-import dev.arbjerg.lavalink.protocol.v4.serialization.Timestamp
 import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.commands.config.CommandConfig
 import dev.pierrot.getLogger
@@ -36,7 +35,7 @@ data class CommandContext(
     val rawArgs: String,
     val prefix: String,
     val isMentionPrefix: Boolean,
-    val commandName: String,
+    val command: PrefixCommand,
     val timestamp: Long
 )
 

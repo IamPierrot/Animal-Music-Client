@@ -2,10 +2,7 @@ package dev.pierrot
 
 import dev.pierrot.handlers.GuildMusicManager
 import dev.pierrot.listeners.JDAListener
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.GuildVoiceState
 import net.dv8tion.jda.api.entities.Message
@@ -38,15 +35,14 @@ fun getOrCreateMusicManager(guildId: String, metadata: MessageChannelUnion? = nu
     }
 }
 
-@OptIn(DelicateCoroutinesApi::class)
-fun setTimeout(delayMillis: Long, block: () -> Any?) {
-    try {
-        GlobalScope.launch {
+fun setTimeout(delayMillis: Long, block: () -> Unit) = runBlocking {
+    CoroutineScope(Dispatchers.Default).launch {
+        try {
             delay(delayMillis)
             block()
+        } catch (e: Exception) {
+            getLogger("Error").error("Error: ${e.message}")
         }
-    } catch (err: Exception) {
-        getLogger("Error").error(err.message)
     }
 }
 
@@ -67,31 +63,6 @@ fun String.toCapital(): String {
     }
     return this.substring(0, 1).uppercase(Locale.getDefault()) + this.substring(1)
 }
-
-fun isNotSameVoice(user1: GuildVoiceState?, user2: GuildVoiceState?, message: Message): Boolean {
-    if (user1 == null || user2 == null) return true
-
-    if (user1.channel == null) {
-        replyError(message, "❌ | Bạn cần vào voice để thực hiện lệnh này!")
-        return true
-    }
-
-    if (user2.channel?.id != null && user1.channel?.id != user2.channel?.id) {
-        replyError(message, "❌ | Bạn không có ở cùng voice với tui~~")
-        return true
-    }
-
-    return false
-}
-
-private fun replyError(message: Message, errorMessage: String) {
-    message.replyEmbeds(
-        EmbedBuilder()
-            .setAuthor(errorMessage)
-            .build()
-    ).queue()
-}
-
 
 fun tempReply(context: Message, message: Any, delayMillis: Long = 20000) {
     val sentMessage: Message = when (message) {

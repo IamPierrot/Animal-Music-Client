@@ -7,6 +7,7 @@ import dev.pierrot.components.base.ComponentRegistry
 import dev.pierrot.getLogger
 import dev.pierrot.models.PlayerEvent
 import dev.pierrot.models.PlayerSyncData
+import net.dv8tion.jda.api.entities.Activity
 import net.dv8tion.jda.api.events.guild.GuildJoinEvent
 import net.dv8tion.jda.api.events.guild.GuildLeaveEvent
 import net.dv8tion.jda.api.events.guild.voice.GuildVoiceUpdateEvent
@@ -66,7 +67,6 @@ class JDAListener : ListenerAdapter() {
     }
 
     override fun onGenericComponentInteractionCreate(event: GenericComponentInteractionCreateEvent) {
-        logger.info(event.componentId)
         ComponentRegistry.instance.onHandleComponent(event)
     }
 
@@ -92,6 +92,8 @@ class JDAListener : ListenerAdapter() {
         animalSync.send("guild_sync", animalSync.clientId.toString(), guilds)
 
         CommandRegistry.loadCommands()
+
+        event.jda.presence.setPresence(Activity.listening("Waiting for sponsor :3"), true)
     }
 
     override fun onGuildJoin(event: GuildJoinEvent) {

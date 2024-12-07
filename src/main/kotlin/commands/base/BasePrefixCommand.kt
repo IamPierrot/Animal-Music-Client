@@ -7,7 +7,6 @@ import dev.pierrot.commands.core.CooldownManager
 import dev.pierrot.commands.core.PrefixCommand
 import dev.pierrot.commands.types.CooldownScopes
 import dev.pierrot.getLogger
-import dev.pierrot.listeners.AnimalSync
 import dev.pierrot.tempReply
 import org.slf4j.Logger
 import java.time.Duration
@@ -17,7 +16,6 @@ abstract class BasePrefixCommand : PrefixCommand {
     private val logger: Logger = getLogger(this::class.java)
     override val commandConfig: CommandConfig = CommandConfig.Builder().build()
     protected open val cooldownScope: CooldownScopes = CooldownScopes.USER
-    protected val animalSync: AnimalSync = AnimalSync.getInstance()
 
     private val cooldownManager = CooldownManager()
 
@@ -34,10 +32,6 @@ abstract class BasePrefixCommand : PrefixCommand {
             val remainingCooldown = cooldownManager.getRemainingCooldown(cooldownKey)
             if (remainingCooldown > Duration.ZERO) return CommandResult.CooldownActive(remainingCooldown)
 
-            // Check voice state if required
-            val memberVoiceState = context.event.member?.voiceState
-            if (memberVoiceState?.channel == null)
-                return CommandResult.Error("❌ | Bạn cần vào voice channel để thực hiện lệnh này!")
 
             // Execute command logic
             return executeCommand(context).also { result ->
