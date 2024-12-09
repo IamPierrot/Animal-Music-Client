@@ -1,18 +1,26 @@
 package dev.pierrot.commands.prefix
 
-import dev.pierrot.LoopMode
 import dev.pierrot.commands.base.BasePrefixCommand
+import dev.pierrot.commands.config.CommandConfig
 import dev.pierrot.commands.core.CommandContext
 import dev.pierrot.commands.core.CommandResult
 import dev.pierrot.embed
 import dev.pierrot.getOrCreateMusicManager
 import dev.pierrot.tempReply
 import java.awt.Color
+import java.time.Duration
 
 class Loop : BasePrefixCommand() {
     override val name: String = "loop"
     override val description: String = "Điều chỉnh lặp hàng phát"
     override val aliases: Array<String> = arrayOf("lap")
+
+    override val commandConfig: CommandConfig
+        get() = CommandConfig.Builder()
+            .withRequireVoiceChannel()
+            .withCooldown(Duration.ofSeconds(5))
+            .withCategory("music")
+            .build()
 
     override fun executeCommand(context: CommandContext): CommandResult {
         val guildMusicManager = getOrCreateMusicManager(context.event.guild.id, context.event.channel)
