@@ -21,11 +21,15 @@ abstract class BasePrefixCommand : PrefixCommand {
 
     final override fun execute(context: CommandContext): CommandResult {
         try {
+            if (context.command.commandConfig.category.equals(
+                    "music",
+                    ignoreCase = true
+                ) && context.event.member?.voiceState == null
+            ) return CommandResult.Error("❌ | Bạn cần ở trong voice channel để sử dụng lệnh này.")
+
             // Check permissions
             val permissionResult = checkPermissions(context)
-            if (permissionResult != CommandResult.Success) {
-                return permissionResult
-            }
+            if (permissionResult != CommandResult.Success) return permissionResult
 
             // Check cooldown
             val cooldownKey = cooldownScope.getKey(context)
@@ -57,23 +61,17 @@ abstract class BasePrefixCommand : PrefixCommand {
 
         // Check bot permissions
         val missingBotPermissions = commandConfig.requireBotPermissions.filter { !selfMember.hasPermission(it) }
-        if (missingBotPermissions.isNotEmpty()) {
-            tempReply(
-                context.event.message,
-                "❌ | Bot thiếu những quyền sau: ${missingBotPermissions.joinToString(" ") { "`$it`" }}."
-            )
-            return CommandResult.InsufficientPermissions
-        }
+        if (missingBotPermissions.isNotEmpty()) tempReply(
+            context.event.message,
+            "❌ | Bot thiếu những quyền sau: ${missingBotPermissions.joinToString(" ") { "`$it`" }}."
+        ).also { return CommandResult.InsufficientPermissions }
 
         // Check user permissions
         val missingUserPermissions = commandConfig.requireUserPermissions.filter { !member.hasPermission(it) }
-        if (missingUserPermissions.isNotEmpty()) {
-            tempReply(
-                context.event.message,
-                "❌ | Bạn thiếu những quyền sau: ${missingUserPermissions.joinToString(" ") { "`$it`" }}."
-            )
-            return CommandResult.InsufficientPermissions
-        }
+        if (missingUserPermissions.isNotEmpty()) tempReply(
+            context.event.message,
+            "❌ | Bạn thiếu những quyền sau: ${missingUserPermissions.joinToString(" ") { "`$it`" }}."
+        ).also { CommandResult.InsufficientPermissions }
 
         return CommandResult.Success
     }
