@@ -204,6 +204,11 @@ class AnimalSync private constructor(val clientId: Int) {
         }
     }
 
+    @Synchronized
+    fun isConnect(): Boolean {
+        return hubConnection.connectionState == HubConnectionState.CONNECTED
+    }
+
     private fun connect() {
         if (hubConnection.connectionState != HubConnectionState.CONNECTED) {
             hubConnection.start()

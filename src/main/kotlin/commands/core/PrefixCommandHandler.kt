@@ -21,19 +21,14 @@ object MessageHandler {
     private val cleanupExecutor = Executors.newSingleThreadScheduledExecutor()
     private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    fun setupCleanupTask() {
-        cleanupExecutor.scheduleAtFixedRate({
-            val currentTime = System.currentTimeMillis()
-            pendingCommands.entries.removeIf { (_, context) ->
-                currentTime - context.timestamp > TimeUnit.MINUTES.toMillis(5)
-            }
-        }, 1, 1, TimeUnit.MINUTES)
-    }
+    fun handle(event: MessageReceivedEvent) {
+        if (event.author.isBot) return
 
-    fun setupPermanentSubscriptions() {
-        animalSync.onMap("play") { message -> processMessage("play", message) }
-        animalSync.onMap("no_client") { message -> processMessage("no_client", message) }
-        animalSync.onMap("command") { message -> processMessage("command", message) }
+        coroutineScope.launch {
+            val context = createMessageContext(event) ?: return@launch
+
+            processCommand(context.command, context)
+        }
     }
 
     private fun processMessage(type: String, message: Map<String, Any>) {
@@ -43,10 +38,7 @@ object MessageHandler {
         coroutineScope.launch {
             pendingCommands.remove(messageId)?.let { context ->
                 when (type) {
-                    "play", "command" -> {
-                        handleCommandResult(context.command.execute(context), context, context.command)
-                    }
-
+                    "play", "command" -> runCommand(context)
                     "no_client" -> {
                         context.event.channel.sendMessage(
                             "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
@@ -57,14 +49,34 @@ object MessageHandler {
         }
     }
 
-    fun handle(event: MessageReceivedEvent) {
-        if (event.author.isBot) return
+    private fun runCommand(context: CommandContext) {
+        handleCommandResult(context.command.execute(context), context)
+    }
 
-        coroutineScope.launch {
-            val context = createMessageContext(event) ?: return@launch
 
-            processCommand(context.command, context)
-        }
+    private fun findCommand(commandName: String): PrefixCommand? {
+        return CommandRegistry.getCommand(commandName)
+    }
+
+    private fun handleMusicCommand(context: CommandContext) = runBlocking {
+        animalSync.send(
+            "sync_play",
+            context.event.messageId,
+            context.event.member?.voiceState?.channel?.id,
+            context.event.guild.id,
+            context.event.channel.id,
+            context.args
+        )
+    }
+
+    private fun handleRegularCommand(context: CommandContext) = runBlocking {
+        animalSync.send(
+            "command_sync",
+            context.event.messageId,
+            context.event.guild.id,
+            context.event.channel.id,
+            context.event.member?.voiceState?.channel?.id
+        )
     }
 
     private fun createMessageContext(event: MessageReceivedEvent): CommandContext? {
@@ -93,13 +105,9 @@ object MessageHandler {
         )
     }
 
-    private fun findCommand(commandName: String): PrefixCommand? {
-        return CommandRegistry.getCommand(commandName)
-    }
-
     private fun processCommand(command: PrefixCommand, context: CommandContext) = runBlocking {
         if (!validateVoiceRequirements(command, context)) return@runBlocking
-
+        if (!animalSync.isConnect()) runCommand(context).also { return@runBlocking }
         pendingCommands[context.event.messageId] = context
 
         try {
@@ -121,27 +129,6 @@ object MessageHandler {
         }
     }
 
-    private fun handleMusicCommand(context: CommandContext) = runBlocking {
-        animalSync.send(
-            "sync_play",
-            context.event.messageId,
-            context.event.member?.voiceState?.channel?.id,
-            context.event.guild.id,
-            context.event.channel.id,
-            context.args
-        )
-    }
-
-    private fun handleRegularCommand(context: CommandContext) = runBlocking {
-        animalSync.send(
-            "command_sync",
-            context.event.messageId,
-            context.event.guild.id,
-            context.event.channel.id,
-            context.event.member?.voiceState?.channel?.id
-        )
-    }
-
     private fun validateVoiceRequirements(command: PrefixCommand, context: CommandContext): Boolean {
         val needsVoice = command.commandConfig.voiceChannel ||
                 command.commandConfig.category.equals("music", ignoreCase = true)
@@ -151,10 +138,7 @@ object MessageHandler {
 
         return when {
             !needsVoice -> true
-            memberVoiceState?.channel == null -> {
-                tempReply(context.event.message, "❌ | Bạn cần ở trong voice channel để sử dụng lệnh này.")
-                return false
-            }
+            memberVoiceState?.channel == null -> false
             command.commandConfig.category.equals("music", ignoreCase = true) &&
                     selfVoiceState?.channel != null &&
                     memberVoiceState.channel?.id != selfVoiceState.channel?.id -> false
@@ -188,7 +172,6 @@ object MessageHandler {
     private fun handleCommandResult(
         result: CommandResult,
         context: CommandContext,
-        command: PrefixCommand
     ) {
         when (result) {
             is CommandResult.Success -> Unit
@@ -205,9 +188,24 @@ object MessageHandler {
             CommandResult.InsufficientPermissions -> Unit
             CommandResult.InvalidArguments -> tempReply(
                 context.event.message,
-                "Sai cách dùng lệnh, cách dùng đúng: ${command.commandConfig.usage}"
+                "Sai cách dùng lệnh, cách dùng đúng: ${context.command.commandConfig.usage}"
             )
         }
+    }
+
+    fun setupCleanupTask() {
+        cleanupExecutor.scheduleAtFixedRate({
+            val currentTime = System.currentTimeMillis()
+            pendingCommands.entries.removeIf { (_, context) ->
+                currentTime - context.timestamp > TimeUnit.MINUTES.toMillis(5)
+            }
+        }, 1, 1, TimeUnit.MINUTES)
+    }
+
+    fun setupPermanentSubscriptions() {
+        animalSync.onMap("play") { message -> processMessage("play", message) }
+        animalSync.onMap("no_client") { message -> processMessage("no_client", message) }
+        animalSync.onMap("command") { message -> processMessage("command", message) }
     }
 
     private fun sendErrorEmbed(message: Message, error: String, delay: Long = 20_000) {

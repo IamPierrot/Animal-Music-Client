@@ -42,7 +42,7 @@ data class CommandContext(
 // Command Registry (Singleton Pattern)
 object CommandRegistry {
     private val logger: Logger = getLogger(CommandRegistry::class.java)
-    private val commands = mutableMapOf<String, PrefixCommand>()
+    val commands = mutableMapOf<String, PrefixCommand>()
     private val aliases = mutableMapOf<String, String>()
 
     private fun registerCommand(prefixCommand: PrefixCommand) {
