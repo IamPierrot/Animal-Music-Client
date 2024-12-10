@@ -40,9 +40,10 @@ object MessageHandler {
                 when (type) {
                     "play", "command" -> runCommand(context)
                     "no_client" -> {
-                        context.event.channel.sendMessage(
+                        tempReply(
+                            context.event.message,
                             "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
-                        ).queue()
+                        )
                     }
                 }
             }
