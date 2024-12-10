@@ -134,15 +134,10 @@ object MessageHandler {
                 command.commandConfig.category.equals("music", ignoreCase = true)
 
         val memberVoiceState = context.event.member?.voiceState
-        val selfVoiceState = context.event.guild.selfMember.voiceState
 
         return when {
             !needsVoice -> true
             memberVoiceState?.channel == null -> false
-            command.commandConfig.category.equals("music", ignoreCase = true) &&
-                    selfVoiceState?.channel != null &&
-                    memberVoiceState.channel?.id != selfVoiceState.channel?.id -> false
-
             else -> true
         }
     }

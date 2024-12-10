@@ -21,11 +21,21 @@ abstract class BasePrefixCommand : PrefixCommand {
 
     final override fun execute(context: CommandContext): CommandResult {
         try {
+            val memberVoiceState = context.event.member?.voiceState
+            val selfVoiceState = context.event.guild.selfMember.voiceState
             if (context.command.commandConfig.category.equals(
                     "music",
                     ignoreCase = true
-                ) && context.event.member?.voiceState == null
-            ) return CommandResult.Error("❌ | Bạn cần ở trong voice channel để sử dụng lệnh này.")
+                )
+            ) {
+                if (context.event.member?.voiceState == null
+                ) return CommandResult.Error("❌ | Bạn cần ở trong voice channel để sử dụng lệnh này.")
+                else if (
+                    selfVoiceState?.channel != null &&
+                    memberVoiceState!!.channel?.id != selfVoiceState.channel?.id
+                ) return CommandResult.Success
+            }
+
 
             // Check permissions
             val permissionResult = checkPermissions(context)
