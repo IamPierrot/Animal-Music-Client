@@ -99,6 +99,11 @@
                 <configuration>
                     <outputDirectory>${project.basedir}/out/artifacts/music_jar</outputDirectory>
                     <finalName>music</finalName>
+                    <archive>
+                        <manifestEntries>
+                            <Main-Class>MainKt</Main-Class>
+                        </manifestEntries>
+                    </archive>
                 </configuration>
             </plugin>
 
