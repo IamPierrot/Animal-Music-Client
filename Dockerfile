@@ -10,7 +10,7 @@ RUN apk add --no-cache \
     libxrender \
     libxext && \
     apk add --no-cache zip && \
-    zip -d app.jar 'META-INF/*.SF' 'META-INF/*.RSA'
+    zip -d app.jar 'META-INF/*.SF' 'META-INF/*.RSA' || true
 
 ENV PREFIX="ish" \
     TOKEN="" \
