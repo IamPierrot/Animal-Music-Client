@@ -1,9 +1,9 @@
 package dev.pierrot.components.imps
 
 import dev.pierrot.components.core.ButtonComponent
-import dev.pierrot.embed
-import dev.pierrot.getOrCreateMusicManager
-import dev.pierrot.tempReply
+import dev.pierrot.service.embed
+import dev.pierrot.service.getOrCreateMusicManager
+import dev.pierrot.service.tempReply
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent
 import java.awt.Color
 

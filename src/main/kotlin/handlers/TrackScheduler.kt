@@ -4,11 +4,10 @@ import canvas.getMusicCard
 import dev.arbjerg.lavalink.client.event.TrackEndEvent
 import dev.arbjerg.lavalink.client.event.TrackStartEvent
 import dev.arbjerg.lavalink.client.player.Track
-import dev.pierrot.LoopMode
-import dev.pierrot.embed
-import dev.pierrot.getLogger
-import dev.pierrot.listeners.AnimalSync
-import dev.pierrot.setTimeout
+import dev.pierrot.service.LoopMode
+import dev.pierrot.service.embed
+import dev.pierrot.service.getLogger
+import dev.pierrot.service.setTimeout
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.entities.MessageEmbed

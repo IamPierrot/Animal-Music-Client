@@ -6,9 +6,9 @@ import dev.pierrot.commands.config.CommandConfig
 import dev.pierrot.commands.core.CommandContext
 import dev.pierrot.commands.core.CommandResult
 import dev.pierrot.config
-import dev.pierrot.getOrCreateMusicManager
 import dev.pierrot.handlers.AudioLoader
-import dev.pierrot.joinHelper
+import dev.pierrot.service.getOrCreateMusicManager
+import dev.pierrot.service.joinHelper
 import net.dv8tion.jda.api.Permission
 import java.time.Duration
 

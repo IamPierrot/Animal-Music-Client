@@ -5,8 +5,8 @@ import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.commands.config.CommandConfig
 import dev.pierrot.commands.core.CommandContext
 import dev.pierrot.commands.core.CommandResult
-import dev.pierrot.embed
-import dev.pierrot.getOrCreateMusicManager
+import dev.pierrot.service.embed
+import dev.pierrot.service.getOrCreateMusicManager
 import java.util.*
 import java.util.stream.Collectors
 import kotlin.math.min

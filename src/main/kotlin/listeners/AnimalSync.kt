@@ -5,7 +5,7 @@ import com.microsoft.signalr.HubConnectionBuilder
 import com.microsoft.signalr.HubConnectionState
 import com.microsoft.signalr.Subscription
 import dev.pierrot.config
-import dev.pierrot.getLogger
+import dev.pierrot.service.getLogger
 import io.reactivex.rxjava3.core.Single
 import io.reactivex.rxjava3.disposables.Disposable
 import io.reactivex.rxjava3.schedulers.Schedulers

@@ -1,10 +1,10 @@
 package dev.pierrot.commands.core
 
 import dev.pierrot.config
-import dev.pierrot.getLogger
 import dev.pierrot.listeners.AnimalSync
-import dev.pierrot.setTimeout
-import dev.pierrot.tempReply
+import dev.pierrot.service.getLogger
+import dev.pierrot.service.setTimeout
+import dev.pierrot.service.tempReply
 import kotlinx.coroutines.*
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message

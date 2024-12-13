@@ -7,9 +7,9 @@ import dev.pierrot.commands.core.CommandRegistry
 import dev.pierrot.commands.core.CommandResult
 import dev.pierrot.commands.core.PrefixCommand
 import dev.pierrot.config
-import dev.pierrot.embed
-import dev.pierrot.tempReply
-import dev.pierrot.toCapital
+import dev.pierrot.service.embed
+import dev.pierrot.service.tempReply
+import dev.pierrot.service.toCapital
 import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.MessageEmbed
 

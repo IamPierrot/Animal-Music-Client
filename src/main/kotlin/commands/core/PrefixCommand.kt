@@ -2,7 +2,7 @@ package dev.pierrot.commands.core
 
 import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.commands.config.CommandConfig
-import dev.pierrot.getLogger
+import dev.pierrot.service.getLogger
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import org.reflections.Reflections
 import org.slf4j.Logger

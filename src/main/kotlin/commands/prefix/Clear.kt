@@ -1,34 +1,28 @@
 package dev.pierrot.commands.prefix
 
-import dev.pierrot.App
 import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.commands.config.CommandConfig
 import dev.pierrot.commands.core.CommandContext
 import dev.pierrot.commands.core.CommandResult
 import dev.pierrot.service.getOrCreateMusicManager
-import net.dv8tion.jda.api.Permission
+import java.time.Duration
 
-class Stop : BasePrefixCommand() {
-    override val name: String = "stop"
-    override val description: String = "dừng hàng phát ngay lập tức"
-    override val aliases: Array<String> = arrayOf("dung", "yamate", "cut", "cook", "thuongem")
-
+class Clear : BasePrefixCommand() {
+    override val name: String = "clear"
+    override val description: String = "dọn dẹp hàng chờ"
+    override val aliases: Array<String> = arrayOf("cls")
     override val commandConfig: CommandConfig
         get() = CommandConfig.Builder()
             .withCategory("music")
-            .withBotPermissions(listOf(Permission.VOICE_SPEAK, Permission.VOICE_CONNECT))
+            .withCooldown(Duration.ofSeconds(10))
             .withRequireVoiceChannel()
             .build()
 
     override fun executeCommand(context: CommandContext): CommandResult {
         val musicManager = getOrCreateMusicManager(context.event.guild.id)
 
-        context.event.jda.directAudioController.disconnect(context.event.guild)
         musicManager.stop()
-        context.event.message.reply("Đã dọn sách hàng chờ và xin chào tạm biệt <3").queue()
-
-        App.ServiceLocator.musicManagerStrategy.removeMusicManager(context.event.guild.id)
-
+        context.event.message.reply("Đã dọn sách hàng chờ :3").queue()
         return CommandResult.Success
     }
 }

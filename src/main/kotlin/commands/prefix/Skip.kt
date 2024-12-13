@@ -4,8 +4,8 @@ import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.commands.config.CommandConfig
 import dev.pierrot.commands.core.CommandContext
 import dev.pierrot.commands.core.CommandResult
-import dev.pierrot.getOrCreateMusicManager
-import dev.pierrot.tempReply
+import dev.pierrot.service.getOrCreateMusicManager
+import dev.pierrot.service.tempReply
 import net.dv8tion.jda.api.Permission
 
 class Skip : BasePrefixCommand() {
@@ -21,7 +21,7 @@ class Skip : BasePrefixCommand() {
             .build()
 
     override fun executeCommand(context: CommandContext): CommandResult {
-        val musicManager = getOrCreateMusicManager(context.event.guild.id, context.event.channel)
+        val musicManager = getOrCreateMusicManager(guildId = context.event.guild.id, metadata = context.event.channel)
 
         if (musicManager.isPlaying()) {
             context.event.message.reply("Bỏ qua bài phát hiện tại!").queue()

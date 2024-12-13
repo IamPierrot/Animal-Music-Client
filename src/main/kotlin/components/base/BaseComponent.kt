@@ -1,6 +1,6 @@
 package dev.pierrot.components.base
 
-import dev.pierrot.getLogger
+import dev.pierrot.service.getLogger
 import net.dv8tion.jda.api.entities.Guild
 import net.dv8tion.jda.api.entities.Member
 import net.dv8tion.jda.api.interactions.components.ComponentInteraction

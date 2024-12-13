@@ -6,8 +6,8 @@ import dev.pierrot.commands.core.CommandResult
 import dev.pierrot.commands.core.CooldownManager
 import dev.pierrot.commands.core.PrefixCommand
 import dev.pierrot.commands.types.CooldownScopes
-import dev.pierrot.getLogger
-import dev.pierrot.tempReply
+import dev.pierrot.service.getLogger
+import dev.pierrot.service.tempReply
 import org.slf4j.Logger
 import java.time.Duration
 

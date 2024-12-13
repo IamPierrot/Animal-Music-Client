@@ -5,7 +5,7 @@ import dev.pierrot.commands.config.CommandConfig
 import dev.pierrot.commands.core.CommandContext
 import dev.pierrot.commands.core.CommandResult
 import dev.pierrot.config
-import dev.pierrot.getOrCreateMusicManager
+import dev.pierrot.service.getOrCreateMusicManager
 import java.time.Duration
 
 class Removetrack : BasePrefixCommand() {

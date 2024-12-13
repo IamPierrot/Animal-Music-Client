@@ -3,10 +3,10 @@ package dev.pierrot.handlers
 import dev.arbjerg.lavalink.client.AbstractAudioLoadResultHandler
 import dev.arbjerg.lavalink.client.player.*
 import dev.pierrot.App
-import dev.pierrot.embed
 import dev.pierrot.listeners.AnimalSync
 import dev.pierrot.models.PlayerEvent
 import dev.pierrot.models.PlayerSyncData
+import dev.pierrot.service.embed
 import net.dv8tion.jda.api.entities.MessageEmbed
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import java.awt.Color

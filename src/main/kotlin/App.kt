@@ -7,10 +7,10 @@ import dev.arbjerg.lavalink.client.getUserIdFromToken
 import dev.arbjerg.lavalink.libraries.jda.JDAVoiceUpdateListener
 import dev.pierrot.handlers.GuildMusicManager
 import dev.pierrot.listeners.JDAListener
+import dev.pierrot.service.getLogger
 import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.JDABuilder
 import net.dv8tion.jda.api.requests.GatewayIntent
-import net.dv8tion.jda.api.utils.cache.CacheFlag
 import java.util.concurrent.ConcurrentHashMap
 
 class App private constructor() {

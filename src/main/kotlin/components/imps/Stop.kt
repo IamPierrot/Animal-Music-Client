@@ -1,7 +1,7 @@
 package dev.pierrot.components.imps
 
 import dev.pierrot.components.core.ButtonComponent
-import dev.pierrot.getOrCreateMusicManager
+import dev.pierrot.service.getOrCreateMusicManager
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent
 
 class Stop : ButtonComponent(

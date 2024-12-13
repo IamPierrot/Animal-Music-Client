@@ -4,9 +4,9 @@ import dev.pierrot.App
 import dev.pierrot.commands.core.CommandRegistry
 import dev.pierrot.commands.core.MessageHandler
 import dev.pierrot.components.base.ComponentRegistry
-import dev.pierrot.getLogger
 import dev.pierrot.models.PlayerEvent
 import dev.pierrot.models.PlayerSyncData
+import dev.pierrot.service.getLogger
 import net.dv8tion.jda.api.entities.Activity
 import net.dv8tion.jda.api.events.guild.GuildJoinEvent
 import net.dv8tion.jda.api.events.guild.GuildLeaveEvent

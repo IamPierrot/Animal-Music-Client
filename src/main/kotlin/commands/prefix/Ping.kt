@@ -4,8 +4,7 @@ import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.commands.config.CommandConfig
 import dev.pierrot.commands.core.CommandContext
 import dev.pierrot.commands.core.CommandResult
-import dev.pierrot.embed
-import net.dv8tion.jda.api.EmbedBuilder
+import dev.pierrot.service.embed
 import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.entities.Guild
 import net.dv8tion.jda.api.entities.User
