@@ -101,7 +101,7 @@
                     <finalName>music</finalName>
                     <archive>
                         <manifestEntries>
-                            <Main-Class>MainKt</Main-Class>
+                            <Main-Class>dev.pierrot.MainKt</Main-Class>
                         </manifestEntries>
                     </archive>
                 </configuration>
