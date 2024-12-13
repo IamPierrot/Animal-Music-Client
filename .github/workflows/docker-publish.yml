@@ -44,7 +44,7 @@ jobs:
       # Build Docker image
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/isherry-musict:latest .
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/isherry-music:latest .
 
       # Push image lên Docker Hub
       - name: Push Docker image to Docker Hub
