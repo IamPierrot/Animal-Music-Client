@@ -29,7 +29,7 @@
 
     <build>
         <sourceDirectory>src/main/kotlin</sourceDirectory>
-
+        <outputDirectory>${project.basedir}/out/artifacts/music_jar</outputDirectory>
         <plugins>
             <plugin>
                 <groupId>org.jetbrains.kotlin</groupId>
@@ -91,6 +91,16 @@
                 </execution>
             </executions>
         </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <outputDirectory>${project.basedir}/out/artifacts/music_jar</outputDirectory>
+                    <finalName>music</finalName>
+                </configuration>
+            </plugin>
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
