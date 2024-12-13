@@ -1,7 +1,6 @@
 package dev.pierrot.components.base
 
-import dev.pierrot.components.core.ButtonComponent
-import dev.pierrot.getLogger
+import dev.pierrot.service.getLogger
 import net.dv8tion.jda.api.events.interaction.component.GenericComponentInteractionCreateEvent
 import org.reflections.Reflections
 
