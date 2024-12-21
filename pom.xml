@@ -95,7 +95,7 @@
                                     </includes>
                                 </filter>
                             </filters>
-                            <minimizeJar>false</minimizeJar>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
                         </configuration>
                     </execution>
                 </executions>
