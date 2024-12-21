@@ -46,7 +46,9 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
 
         var msg: Message? = null
         try {
-            msg = guildMusicManager.metadata?.sendFiles(getMusicCard(track.info))?.addActionRow(row)?.complete()
+            val musicCard = getMusicCard(track.info)
+            msg = guildMusicManager.metadata?.sendFiles(musicCard)?.addActionRow(row)?.complete()
+                .also { musicCard.close() }
         } catch (e: TranscoderException) {
             logger.error(e.message)
         } catch (e: IOException) {

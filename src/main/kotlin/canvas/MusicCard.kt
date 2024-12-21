@@ -33,12 +33,14 @@ fun generateImage(option: MusicCardOption): ByteArrayInputStream {
             val authorColor = authorColor ?: "#FFFFFF"
             val imageDarkness = imageDarkness ?: 10
 
-            val noImageSvg = generateSvg(
-                """<svg width=\"837\" height=\"837\" viewBox=\"0 0 837 837\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n" +
-                        "<rect width=\"837\" height=\"837\" fill=\"$progressColor\"/>\n" +
-                        "<path d=\"M419.324 635.912C406.035 635.912 394.658 631.18 385.195 621.717C375.732 612.254 371 600.878 371 587.589C371 574.3 375.732 562.923 385.195 553.46C394.658 543.997 406.035 539.265 419.324 539.265C432.613 539.265 443.989 543.997 453.452 553.46C462.915 562.923 467.647 574.3 467.647 587.589C467.647 600.878 462.915 612.254 453.452 621.717C443.989 631.18 432.613 635.912 419.324 635.912ZM371 490.941V201H467.647V490.941H371Z\" fill=\"$backgroundColor\"/>\n" +
-                        "</svg>"""
-            )
+
+            val noImageStringSvg = """
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 837 837">
+                  <rect width="837" height="837" fill="$progressColor"/>
+                  <path d="M419.324 635.912C406.035 635.912 394.658 631.18 385.195 621.717C375.732 612.254 371 600.878 371 587.589C371 574.3 375.732 562.923 385.195 553.46C394.658 543.997 406.035 539.265 419.324 539.265C432.613 539.265 443.989 543.997 453.452 553.46C462.915 562.923 467.647 574.3 467.647 587.589C467.647 600.878 462.915 612.254 453.452 621.717C443.989 631.18 432.613 635.912 419.324 635.912ZM371 490.941V201H467.647V490.941H371Z" fill="$backgroundColor"/>
+                </svg>
+            """.trimIndent()
+            val noImageSvg = generateSvg(noImageStringSvg)
 
             thumbnailImage = thumbnailImage ?: noImageSvg
 
@@ -68,12 +70,13 @@ fun generateImage(option: MusicCardOption): ByteArrayInputStream {
 
             if (backgroundImage != null) {
                 try {
-                    val darknessSvg = generateSvg(
-                        """<svg width=\"2367\" height=\"520\" viewBox=\"0 0 2367 520\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n" +
-                                "<path d=\"M0 0H2367V520H0V0Z\" fill=\"#070707\" fill-opacity=\"${imageDarkness / 100.0}\"/>\n" +
-                                "</svg>"""
-                    )
+                    val darkSvg = """
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2367 520">
+                          <path d="M0 0H2367V520H0V0Z" fill="#070707" fill-opacity="${imageDarkness / 100.0}"/>
+                        </svg>
+                    """.trimIndent()
 
+                    val darknessSvg = generateSvg(darkSvg)
                     val image = cropImage(
                         CropOption()
                             .setImagePath(backgroundImage!!)
@@ -114,11 +117,15 @@ fun generateImage(option: MusicCardOption): ByteArrayInputStream {
 }
 
 private fun drawBackground(ctx: Graphics2D, colorHex: String) {
-    val backgroundSvg = generateSvg(
-        """<svg width=\"2367\" height=\"520\" viewBox=\"0 0 2367 520\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n" +
-                "<path d=\"M0 260C0 116.406 116.406 0 260 0H2107C2250.59 0 2367 116.406 2367 260V260C2367 403.594 2250.59 520 2107 520H260C116.406 520 0 403.594 0 260V260Z\" fill=\"$colorHex\"/>\n" +
-                "</svg>"""
-    )
+    val backgroundSvgString = """
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2367 520">
+          <path 
+            d="M0 260C0 116.406 116.406 0 260 0H2107C2250.59 0 2367 116.406 2367 260V260C2367 403.594 2250.59 520 2107 520H260C116.406 520 0 403.594 0 260V260Z" 
+            fill="$colorHex"
+          />
+        </svg>
+    """.trimIndent()
+    val backgroundSvg = generateSvg(backgroundSvgString)
 
     val background = loadImage(backgroundSvg)
     ctx.drawImage(background, 0, 0, null)
@@ -138,7 +145,6 @@ private fun drawProgress(ctx: Graphics2D, progress: Int, barColorHex: String, pr
 
 @Throws(TranscoderException::class, IOException::class)
 fun getMusicCard(trackInfo: TrackInfo): FileUpload {
-    // Bảng màu nền mặc định
     val colorPalette = arrayOf(
         "#070707",
         "#0D0D0D",
@@ -148,20 +154,14 @@ fun getMusicCard(trackInfo: TrackInfo): FileUpload {
         "#404040"
     )
 
-    // URL ảnh artwork
     val artworkImage = trackInfo.artworkUrl
 
-    // Chọn màu nền ngẫu nhiên từ bảng màu
     val random = Random()
     val backgroundColor = colorPalette[random.nextInt(colorPalette.size)]
 
-    // Lấy màu sắc chủ đạo từ ảnh artwork
     val dominantColor = getLightColors(artworkImage).first()
-
-    // Tạo cấu hình MusicCardOption
     val option = getMusicCardOption(dominantColor, artworkImage, backgroundColor, trackInfo)
 
-    // Tạo hình ảnh và trả về dưới dạng FileUpload
     return FileUpload.fromData(generateImage(option), "card.png")
 }
 
@@ -171,10 +171,8 @@ private fun getMusicCardOption(
     backgroundColor: String,
     trackInfo: TrackInfo
 ): MusicCardOption {
-    // Chuyển đổi màu chủ đạo sang dạng mã hex
     val dominantColorHex = rgbToHex(dominantColor.red, dominantColor.green, dominantColor.blue)
 
-    // Tạo MusicCardOption và gán giá trị
     return MusicCardOption().apply {
         this.backgroundImage = artworkImage
         this.imageDarkness = 80
@@ -218,14 +216,12 @@ private fun getLightColors(imageUrl: String?): List<Color> {
 }
 
 private fun isLightColor(color: Color): Boolean {
-    // Kiểm tra độ sáng của màu dựa trên công thức
     val rgbComponents = color.getRGBColorComponents(null)
     val brightness = (0.299 * rgbComponents[0] + 0.587 * rgbComponents[1] + 0.114 * rgbComponents[2])
     return brightness > 0.7
 }
 
 private fun rgbToHex(r: Int, g: Int, b: Int): String {
-    // Chuyển đổi RGB sang mã Hex
     return "#%02X%02X%02X".format(r, g, b)
 }
 
