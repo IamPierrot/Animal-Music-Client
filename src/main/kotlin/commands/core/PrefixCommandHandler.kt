@@ -33,8 +33,8 @@ object MessageHandler {
 
     private fun processMessage(type: String, message: Map<String, Any>) {
         val messageId = message["messageId"] as? String ?: return
-        if (message["connectionId"] != animalSync.clientConnectionId) return
-
+//        if (message["connectionId"] != animalSync.clientConnectionId) return
+        logger.info("Đang xử lý $messageId")
         coroutineScope.launch {
             pendingCommands.remove(messageId)?.let { context ->
                 when (type) {
