@@ -35,16 +35,14 @@ object MessageHandler {
         val messageId = message["messageId"] as? String ?: return
 //        if (message["connectionId"] != animalSync.clientConnectionId) return
         logger.info("Đang xử lý $messageId")
-        coroutineScope.launch {
-            pendingCommands.remove(messageId)?.let { context ->
-                when (type) {
-                    "play", "command" -> runCommand(context)
-                    "no_client" -> {
-                        tempReply(
-                            context.event.message,
-                            "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
-                        )
-                    }
+        pendingCommands.remove(messageId)?.let { context ->
+            when (type) {
+                "play", "command" -> runCommand(context)
+                "no_client" -> {
+                    tempReply(
+                        context.event.message,
+                        "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
+                    )
                 }
             }
         }
