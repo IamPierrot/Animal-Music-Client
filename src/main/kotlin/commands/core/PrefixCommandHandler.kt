@@ -35,7 +35,8 @@ object MessageHandler {
         val messageId = message["messageId"] as? String ?: return
 //        if (message["connectionId"] != animalSync.clientConnectionId) return
         logger.info("Đang xử lý $messageId")
-        pendingCommands.remove(messageId)?.let { context ->
+        try {
+            val context = pendingCommands[messageId] ?: return
             when (type) {
                 "play", "command" -> runCommand(context)
                 "no_client" -> {
@@ -45,6 +46,8 @@ object MessageHandler {
                     )
                 }
             }
+        } finally {
+            pendingCommands.remove(messageId)
         }
     }
 
