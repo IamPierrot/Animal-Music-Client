@@ -5,7 +5,6 @@ import dev.pierrot.listeners.AnimalSync
 import dev.pierrot.service.getLogger
 import dev.pierrot.service.tempReply
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
@@ -33,42 +32,40 @@ object MessageHandler {
     private fun setupEvents() {
 
         animalSync.onMap("play") { message ->
-            val messageId = message["messageId"] as String? ?: return@onMap
-
-            contexts[messageId]?.let { context ->
-                processMessage("play", context)
-            }.run { contexts.remove(messageId) }
+            (message["messageId"] as? String ?: return@onMap).also {
+                processMessage("play", it)
+            }
         }
 
         animalSync.onMap("no_client") { message ->
-            val messageId = message["messageId"] as String? ?: return@onMap
-
-            contexts[messageId]?.let { context ->
-                processMessage("no_client", context)
-            }.run { contexts.remove(messageId) }
+            (message["messageId"] as? String ?: return@onMap).also {
+                processMessage("no_client", it)
+            }
         }
 
         animalSync.onMap("command") { message ->
-            val messageId = message["messageId"] as String? ?: return@onMap
-
-            contexts[messageId]?.let { context ->
-                processMessage("command", context)
-            }.run { contexts.remove(messageId) }
+            (message["messageId"] as? String ?: return@onMap).also {
+                processMessage("command", it)
+            }
         }
     }
 
+    @Synchronized
     private fun updateContext(messageId: String, context: CommandContext) {
         contexts[messageId] = context
     }
 
-    private fun processMessage(type: String, context: CommandContext) {
-        when (type) {
-            "play", "command" -> runCommand(context)
-            "no_client" -> {
-                tempReply(
-                    context.event.message,
-                    "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
-                )
+    private fun processMessage(type: String, messageId: String) {
+        synchronized(contexts) {
+            val context = contexts.remove(messageId) ?: return
+            when (type) {
+                "play", "command" -> runCommand(context)
+                "no_client" -> {
+                    tempReply(
+                        context.event.message,
+                        "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
+                    )
+                }
             }
         }
     }
@@ -136,7 +133,6 @@ object MessageHandler {
 
         updateContext(messageId, context)
 
-        delay(1000)
         try {
             if (command.commandConfig.category.equals("music", ignoreCase = true)) {
                 handleMusicCommand(context)
