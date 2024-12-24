@@ -33,24 +33,34 @@ object MessageHandler {
 
         animalSync.onMap("play") { message ->
             val messageId = message["messageId"] as String? ?: return@onMap
-
+            logger.info("$messageId đang xử lý ")
             contexts[messageId]?.let { context ->
-                processMessage("play", context)
+                {
+                    logger.info("$messageId xử lý thành công")
+                    processMessage("command", context)
+                }
             }.run { contexts.remove(messageId) }
         }
 
         animalSync.onMap("no_client") { message ->
             val messageId = message["messageId"] as String? ?: return@onMap
-
+            logger.info("$messageId đang xử lý ")
             contexts[messageId]?.let { context ->
-                processMessage("no_client", context)
+                {
+                    logger.info("$messageId xử lý thành công")
+                    processMessage("command", context)
+                }
             }.run { contexts.remove(messageId) }
         }
 
         animalSync.onMap("command") { message ->
             val messageId = message["messageId"] as String? ?: return@onMap
+            logger.info("$messageId đang xử lý ")
             contexts[messageId]?.let { context ->
-                processMessage("command", context)
+                {
+                    logger.info("$messageId xử lý thành công")
+                    processMessage("command", context)
+                }
             }.run { contexts.remove(messageId) }
         }
     }
