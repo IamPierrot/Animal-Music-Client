@@ -1,53 +1,37 @@
 package dev.pierrot.commands.core
 
+import com.microsoft.signalr.Subscription
 import dev.pierrot.config
 import dev.pierrot.listeners.AnimalSync
 import dev.pierrot.service.getLogger
-import dev.pierrot.service.setTimeout
 import dev.pierrot.service.tempReply
-import kotlinx.coroutines.*
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.runBlocking
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import java.awt.Color
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 
 object MessageHandler {
     private val logger = getLogger("MessageHandler")
     private val animalSync = AnimalSync.getInstance()
-    private val pendingCommands = ConcurrentHashMap<String, CommandContext>()
-    private val cleanupExecutor = Executors.newSingleThreadScheduledExecutor()
-    private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     fun handle(event: MessageReceivedEvent) {
         if (event.author.isBot) return
+        val context = createMessageContext(event) ?: return
 
-        coroutineScope.launch {
-            val context = createMessageContext(event) ?: return@launch
-
-            processCommand(context.command, context)
-        }
+        processCommand(context.command, context)
     }
 
-    private fun processMessage(type: String, message: Map<String, Any>) {
-        val messageId = message["messageId"] as? String ?: return
-//        if (message["connectionId"] != animalSync.clientConnectionId) return
-        logger.info("Đang xử lý $messageId")
-        try {
-            val context = pendingCommands[messageId] ?: return
-            when (type) {
-                "play", "command" -> runCommand(context)
-                "no_client" -> {
-                    tempReply(
-                        context.event.message,
-                        "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
-                    )
-                }
+    private fun processMessage(type: String, context: CommandContext) {
+        when (type) {
+            "play", "command" -> runCommand(context)
+            "no_client" -> {
+                tempReply(
+                    context.event.message,
+                    "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
+                )
             }
-        } finally {
-            pendingCommands.remove(messageId)
         }
     }
 
@@ -102,23 +86,32 @@ object MessageHandler {
             isMentionPrefix = isMentionPrefix,
             command = command,
             args = args.drop(1),
-            rawArgs = withoutPrefix.substringAfter(args[0]).trim(),
-            timestamp = System.currentTimeMillis()
+            rawArgs = withoutPrefix.substringAfter(args[0]).trim()
         )
     }
 
     private fun processCommand(command: PrefixCommand, context: CommandContext) = runBlocking {
         if (!validateVoiceRequirements(command, context)) return@runBlocking
         if (!animalSync.isConnect()) runCommand(context).also { return@runBlocking }
-        pendingCommands[context.event.messageId] = context
+
+        val subscriptions = mutableListOf<Subscription?>()
+
+        subscriptions += animalSync.onMap("play") {
+            processMessage("play", context)
+        }
+        subscriptions += animalSync.onMap("no_client") {
+            processMessage("no_client", context)
+        }
+        subscriptions += animalSync.onMap("command") {
+            processMessage("command", context)
+        }
+
 
         try {
-            withTimeout(10_000) {
-                if (command.commandConfig.category.equals("music", ignoreCase = true)) {
-                    handleMusicCommand(context)
-                } else {
-                    handleRegularCommand(context)
-                }
+            if (command.commandConfig.category.equals("music", ignoreCase = true)) {
+                handleMusicCommand(context)
+            } else {
+                handleRegularCommand(context)
             }
         } catch (e: TimeoutCancellationException) {
             logger.warn("Command timed out: ${context.command}")
@@ -127,7 +120,7 @@ object MessageHandler {
             logger.error("Error processing command: ", e)
             tempReply(context.event.message, "❌ | Đã xảy ra lỗi: ${e.message}")
         } finally {
-            setTimeout(10_000) { pendingCommands.remove(context.event.messageId) }
+            subscriptions.forEach { it?.unsubscribe() }
         }
     }
 
@@ -188,21 +181,6 @@ object MessageHandler {
                 "Sai cách dùng lệnh, cách dùng đúng: ${context.command.commandConfig.usage}"
             )
         }
-    }
-
-    fun setupCleanupTask() {
-        cleanupExecutor.scheduleAtFixedRate({
-            val currentTime = System.currentTimeMillis()
-            pendingCommands.entries.removeIf { (_, context) ->
-                currentTime - context.timestamp > TimeUnit.MINUTES.toMillis(5)
-            }
-        }, 1, 1, TimeUnit.MINUTES)
-    }
-
-    fun setupPermanentSubscriptions() {
-        animalSync.onMap("play") { message -> processMessage("play", message) }
-        animalSync.onMap("no_client") { message -> processMessage("no_client", message) }
-        animalSync.onMap("command") { message -> processMessage("command", message) }
     }
 
     private fun sendErrorEmbed(message: Message, error: String, delay: Long = 20_000) {

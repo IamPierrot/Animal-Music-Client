@@ -36,7 +36,6 @@ data class CommandContext(
     val prefix: String,
     val isMentionPrefix: Boolean,
     val command: PrefixCommand,
-    val timestamp: Long
 )
 
 // Command Registry (Singleton Pattern)
