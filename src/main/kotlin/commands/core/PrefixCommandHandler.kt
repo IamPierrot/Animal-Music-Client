@@ -5,7 +5,6 @@ import dev.pierrot.listeners.AnimalSync
 import dev.pierrot.service.getLogger
 import dev.pierrot.service.tempReply
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.runBlocking
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
@@ -56,16 +55,17 @@ object MessageHandler {
     }
 
     private fun processMessage(type: String, messageId: String) {
-        synchronized(contexts) {
-            val context = contexts.remove(messageId) ?: return
-            when (type) {
-                "play", "command" -> runCommand(context)
-                "no_client" -> {
-                    tempReply(
-                        context.event.message,
-                        "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
-                    )
-                }
+        val context = synchronized(contexts) {
+            contexts.remove(messageId)
+        } ?: return
+
+        when (type) {
+            "play", "command" -> runCommand(context)
+            "no_client" -> {
+                tempReply(
+                    context.event.message,
+                    "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
+                )
             }
         }
     }
@@ -79,7 +79,7 @@ object MessageHandler {
         return CommandRegistry.getCommand(commandName)
     }
 
-    private fun handleMusicCommand(context: CommandContext) = runBlocking {
+    private fun handleMusicCommand(context: CommandContext) {
         animalSync.send(
             "sync_play",
             context.event.messageId,
@@ -90,7 +90,7 @@ object MessageHandler {
         )
     }
 
-    private fun handleRegularCommand(context: CommandContext) = runBlocking {
+    private fun handleRegularCommand(context: CommandContext) {
         animalSync.send(
             "command_sync",
             context.event.messageId,
@@ -125,9 +125,9 @@ object MessageHandler {
         )
     }
 
-    private fun processCommand(command: PrefixCommand, context: CommandContext) = runBlocking {
-        if (!validateVoiceRequirements(command, context)) return@runBlocking
-        if (!animalSync.isConnect()) runCommand(context).also { return@runBlocking }
+    private fun processCommand(command: PrefixCommand, context: CommandContext) {
+        if (!validateVoiceRequirements(command, context)) return
+        if (!animalSync.isConnect()) runCommand(context).also { return }
 
         val messageId = context.event.messageId
 
