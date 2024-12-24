@@ -11,6 +11,7 @@ import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import java.awt.Color
+import java.util.concurrent.ConcurrentHashMap
 
 object MessageHandler {
     private val logger = getLogger("MessageHandler")
@@ -22,6 +23,42 @@ object MessageHandler {
 
         processCommand(context.command, context)
     }
+
+    private val contexts = ConcurrentHashMap<String, CommandContext>()
+    private val subscriptions = ConcurrentHashMap<String, MutableList<Subscription?>>()
+
+    private fun setupEvents(guildId: String) {
+        val guildSubscriptions = mutableListOf<Subscription?>()
+
+        guildSubscriptions += animalSync.onMap("play") { _ ->
+            contexts[guildId]?.let { context ->
+                processMessage("play", context)
+            }
+        }
+        guildSubscriptions += animalSync.onMap("no_client") { _ ->
+            contexts[guildId]?.let { context ->
+                processMessage("no_client", context)
+            }
+        }
+        guildSubscriptions += animalSync.onMap("command") { _ ->
+            contexts[guildId]?.let { context ->
+                processMessage("command", context)
+            }
+        }
+
+        subscriptions[guildId] = guildSubscriptions
+    }
+
+    fun updateContext(guildId: String, context: CommandContext) {
+        contexts[guildId] = context
+    }
+
+    fun clearEvents(guildId: String) {
+        subscriptions[guildId]?.forEach { it?.unsubscribe() }
+        subscriptions.remove(guildId)
+        contexts.remove(guildId)
+    }
+
 
     private fun processMessage(type: String, context: CommandContext) {
         when (type) {
@@ -94,18 +131,10 @@ object MessageHandler {
         if (!validateVoiceRequirements(command, context)) return@runBlocking
         if (!animalSync.isConnect()) runCommand(context).also { return@runBlocking }
 
-        val subscriptions = mutableListOf<Subscription?>()
+        val guildId = context.event.guild.id
 
-        subscriptions += animalSync.onMap("play") { _ ->
-            processMessage("play", context)
-        }
-        subscriptions += animalSync.onMap("no_client") { _ ->
-            processMessage("no_client", context)
-        }
-        subscriptions += animalSync.onMap("command") { _ ->
-            processMessage("command", context)
-        }
-
+        updateContext(guildId, context)
+        if (!subscriptions.containsKey(guildId)) setupEvents(guildId)
 
         try {
             if (command.commandConfig.category.equals("music", ignoreCase = true)) {
@@ -120,7 +149,7 @@ object MessageHandler {
             logger.error("Error processing command: ", e)
             tempReply(context.event.message, "❌ | Đã xảy ra lỗi: ${e.message}")
         } finally {
-            subscriptions.forEach { it?.unsubscribe() }
+            clearEvents(guildId)
         }
     }
 
