@@ -1,11 +1,14 @@
 package dev.pierrot.service
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.entities.MessageEmbed
 import net.dv8tion.jda.api.events.interaction.component.GenericComponentInteractionCreateEvent
 
-fun setTimeout(delayMillis: Long, block: () -> Unit) = runBlocking {
+fun setTimeout(delayMillis: Long, block: suspend () -> Unit) {
     CoroutineScope(Dispatchers.Default).launch {
         try {
             delay(delayMillis)
@@ -23,7 +26,9 @@ fun tempReply(context: Message, message: Any, delayMillis: Long = 20000) {
         else -> throw IllegalArgumentException("Unsupported message type: Must be String or MessageEmbed")
     }
 
-    setTimeout(delayMillis) { sentMessage.delete().queue().runCatching {} }
+    setTimeout(delayMillis) {
+        sentMessage.delete().queue().runCatching {}
+    }
 }
 
 fun tempReply(context: GenericComponentInteractionCreateEvent, message: Any, delayMillis: Long = 20000) {
@@ -33,5 +38,8 @@ fun tempReply(context: GenericComponentInteractionCreateEvent, message: Any, del
         else -> throw IllegalArgumentException("Unsupported message type: Must be String or MessageEmbed")
     }
 
-    setTimeout(delayMillis) { sentMessage.deleteOriginal().queue().runCatching {} }
+    setTimeout(delayMillis) {
+        sentMessage.deleteOriginal().queue().runCatching {}
+    }
 }
+
