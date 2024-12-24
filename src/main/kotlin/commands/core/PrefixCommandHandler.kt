@@ -30,18 +30,23 @@ object MessageHandler {
     private fun setupEvents(guildId: String) {
         val guildSubscriptions = mutableListOf<Subscription?>()
 
-        guildSubscriptions += animalSync.onMap("play") { _ ->
-            contexts[guildId]?.let { context ->
+        guildSubscriptions += animalSync.onMap("play") { message ->
+            val messageId = message["messageId"] as String? ?: return@onMap
+
+            contexts.remove(messageId)?.let { context ->
                 processMessage("play", context)
             }
         }
-        guildSubscriptions += animalSync.onMap("no_client") { _ ->
-            contexts[guildId]?.let { context ->
+        guildSubscriptions += animalSync.onMap("no_client") { message ->
+            val messageId = message["messageId"] as String? ?: return@onMap
+
+            contexts.remove(messageId)?.let { context ->
                 processMessage("no_client", context)
             }
         }
-        guildSubscriptions += animalSync.onMap("command") { _ ->
-            contexts[guildId]?.let { context ->
+        guildSubscriptions += animalSync.onMap("command") { message ->
+            val messageId = message["messageId"] as String? ?: return@onMap
+            contexts.remove(messageId)?.let { context ->
                 processMessage("command", context)
             }
         }
@@ -49,8 +54,8 @@ object MessageHandler {
         subscriptions[guildId] = guildSubscriptions
     }
 
-    private fun updateContext(guildId: String, context: CommandContext) {
-        contexts[guildId] = context
+    private fun updateContext(messageId: String, context: CommandContext) {
+        contexts[messageId] = context
     }
 
     private fun clearEvents(guildId: String) {
@@ -132,8 +137,9 @@ object MessageHandler {
         if (!animalSync.isConnect()) runCommand(context).also { return@runBlocking }
 
         val guildId = context.event.guild.id
+        val messageId = context.event.messageId
 
-        updateContext(guildId, context)
+        updateContext(messageId, context)
         if (!subscriptions.containsKey(guildId)) setupEvents(guildId)
 
         try {
