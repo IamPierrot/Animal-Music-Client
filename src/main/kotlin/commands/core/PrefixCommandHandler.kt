@@ -96,13 +96,13 @@ object MessageHandler {
 
         val subscriptions = mutableListOf<Subscription?>()
 
-        subscriptions += animalSync.onMap("play") {
+        subscriptions += animalSync.onMap("play") { _ ->
             processMessage("play", context)
         }
-        subscriptions += animalSync.onMap("no_client") {
+        subscriptions += animalSync.onMap("no_client") { _ ->
             processMessage("no_client", context)
         }
-        subscriptions += animalSync.onMap("command") {
+        subscriptions += animalSync.onMap("command") { _ ->
             processMessage("command", context)
         }
 
