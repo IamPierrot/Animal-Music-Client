@@ -49,11 +49,11 @@ object MessageHandler {
         subscriptions[guildId] = guildSubscriptions
     }
 
-    fun updateContext(guildId: String, context: CommandContext) {
+    private fun updateContext(guildId: String, context: CommandContext) {
         contexts[guildId] = context
     }
 
-    fun clearEvents(guildId: String) {
+    private fun clearEvents(guildId: String) {
         subscriptions[guildId]?.forEach { it?.unsubscribe() }
         subscriptions.remove(guildId)
         contexts.remove(guildId)
@@ -148,8 +148,6 @@ object MessageHandler {
         } catch (e: Exception) {
             logger.error("Error processing command: ", e)
             tempReply(context.event.message, "❌ | Đã xảy ra lỗi: ${e.message}")
-        } finally {
-            clearEvents(guildId)
         }
     }
 
