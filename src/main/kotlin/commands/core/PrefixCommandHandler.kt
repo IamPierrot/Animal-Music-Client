@@ -1,6 +1,5 @@
 package dev.pierrot.commands.core
 
-import com.microsoft.signalr.Subscription
 import dev.pierrot.config
 import dev.pierrot.listeners.AnimalSync
 import dev.pierrot.service.getLogger
@@ -24,46 +23,39 @@ object MessageHandler {
         processCommand(context.command, context)
     }
 
+    init {
+        setupEvents()
+    }
+
     private val contexts = ConcurrentHashMap<String, CommandContext>()
-    private val subscriptions = ConcurrentHashMap<String, MutableList<Subscription?>>()
 
-    private fun setupEvents(guildId: String) {
-        val guildSubscriptions = mutableListOf<Subscription?>()
+    private fun setupEvents() {
 
-        guildSubscriptions += animalSync.onMap("play") { message ->
+        animalSync.onMap("play") { message ->
             val messageId = message["messageId"] as String? ?: return@onMap
 
-            contexts.remove(messageId)?.let { context ->
+            contexts[messageId]?.let { context ->
                 processMessage("play", context)
-            }
+            }.run { contexts.remove(messageId) }
         }
-        guildSubscriptions += animalSync.onMap("no_client") { message ->
+        animalSync.onMap("no_client") { message ->
             val messageId = message["messageId"] as String? ?: return@onMap
 
-            contexts.remove(messageId)?.let { context ->
+            contexts[messageId]?.let { context ->
                 processMessage("no_client", context)
-            }
+            }.run { contexts.remove(messageId) }
         }
-        guildSubscriptions += animalSync.onMap("command") { message ->
+        animalSync.onMap("command") { message ->
             val messageId = message["messageId"] as String? ?: return@onMap
-            contexts.remove(messageId)?.let { context ->
+            contexts[messageId]?.let { context ->
                 processMessage("command", context)
-            }
+            }.run { contexts.remove(messageId) }
         }
-
-        subscriptions[guildId] = guildSubscriptions
     }
 
     private fun updateContext(messageId: String, context: CommandContext) {
         contexts[messageId] = context
     }
-
-    private fun clearEvents(guildId: String) {
-        subscriptions[guildId]?.forEach { it?.unsubscribe() }
-        subscriptions.remove(guildId)
-        contexts.remove(guildId)
-    }
-
 
     private fun processMessage(type: String, context: CommandContext) {
         when (type) {
@@ -136,11 +128,9 @@ object MessageHandler {
         if (!validateVoiceRequirements(command, context)) return@runBlocking
         if (!animalSync.isConnect()) runCommand(context).also { return@runBlocking }
 
-        val guildId = context.event.guild.id
         val messageId = context.event.messageId
 
         updateContext(messageId, context)
-        if (!subscriptions.containsKey(guildId)) setupEvents(guildId)
 
         try {
             if (command.commandConfig.category.equals("music", ignoreCase = true)) {
