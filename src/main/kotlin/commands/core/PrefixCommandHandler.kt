@@ -38,6 +38,7 @@ object MessageHandler {
                 processMessage("play", context)
             }.run { contexts.remove(messageId) }
         }
+
         animalSync.onMap("no_client") { message ->
             val messageId = message["messageId"] as String? ?: return@onMap
 
@@ -45,6 +46,7 @@ object MessageHandler {
                 processMessage("no_client", context)
             }.run { contexts.remove(messageId) }
         }
+
         animalSync.onMap("command") { message ->
             val messageId = message["messageId"] as String? ?: return@onMap
             contexts[messageId]?.let { context ->

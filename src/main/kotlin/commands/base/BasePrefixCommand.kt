@@ -23,18 +23,14 @@ abstract class BasePrefixCommand : PrefixCommand {
         try {
             val memberVoiceState = context.event.member?.voiceState
             val selfVoiceState = context.event.guild.selfMember.voiceState
-            if (context.command.commandConfig.category.equals(
-                    "music",
-                    ignoreCase = true
-                )
-            ) {
-                if (context.event.member?.voiceState == null
-                ) return CommandResult.Error("❌ | Bạn cần ở trong voice channel để sử dụng lệnh này.")
-                else if (
-                    selfVoiceState?.channel != null &&
-                    memberVoiceState!!.channel?.id != selfVoiceState.channel?.id
-                ) return CommandResult.Success
+            if (context.command.commandConfig.category.equals("music", ignoreCase = true)) {
+                if (memberVoiceState?.channel == null) {
+                    return CommandResult.Error("❌ | Bạn cần ở trong voice channel để sử dụng lệnh này.")
+                } else if (selfVoiceState?.channel != null && memberVoiceState.channel?.id != selfVoiceState.channel?.id) {
+                    return CommandResult.Error("❌ | Bạn cần ở cùng voice channel với bot để sử dụng lệnh này.")
+                }
             }
+
 
 
             // Check permissions
