@@ -5,6 +5,7 @@ import dev.pierrot.listeners.AnimalSync
 import dev.pierrot.service.getLogger
 import dev.pierrot.service.tempReply
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
@@ -33,34 +34,25 @@ object MessageHandler {
 
         animalSync.onMap("play") { message ->
             val messageId = message["messageId"] as String? ?: return@onMap
-            logger.info("$messageId đang xử lý ")
+
             contexts[messageId]?.let { context ->
-                {
-                    logger.info("$messageId xử lý thành công")
-                    processMessage("command", context)
-                }
+                processMessage("play", context)
             }.run { contexts.remove(messageId) }
         }
 
         animalSync.onMap("no_client") { message ->
             val messageId = message["messageId"] as String? ?: return@onMap
-            logger.info("$messageId đang xử lý ")
+
             contexts[messageId]?.let { context ->
-                {
-                    logger.info("$messageId xử lý thành công")
-                    processMessage("command", context)
-                }
+                processMessage("no_client", context)
             }.run { contexts.remove(messageId) }
         }
 
         animalSync.onMap("command") { message ->
             val messageId = message["messageId"] as String? ?: return@onMap
-            logger.info("$messageId đang xử lý ")
+
             contexts[messageId]?.let { context ->
-                {
-                    logger.info("$messageId xử lý thành công")
-                    processMessage("command", context)
-                }
+                processMessage("command", context)
             }.run { contexts.remove(messageId) }
         }
     }
@@ -144,6 +136,7 @@ object MessageHandler {
 
         updateContext(messageId, context)
 
+        delay(1000)
         try {
             if (command.commandConfig.category.equals("music", ignoreCase = true)) {
                 handleMusicCommand(context)
