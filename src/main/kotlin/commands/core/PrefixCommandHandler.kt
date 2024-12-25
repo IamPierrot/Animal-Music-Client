@@ -26,28 +26,57 @@ object MessageHandler {
 
     init {
         setupEvents()
+        startQueueProcessor()
     }
 
     private val contextFutures = ConcurrentHashMap<String, CompletableFuture<CommandContext>>()
     private val contexts = ConcurrentHashMap<String, CommandContext>()
 
+    private val eventQueue = ArrayDeque<Pair<String, String>>()
+    private val queueLock = Any()
+
+    init {
+        startQueueProcessor()
+    }
+
+    private fun startQueueProcessor() {
+        Thread {
+            while (true) {
+                val event = synchronized(queueLock) {
+                    if (eventQueue.isEmpty()) null else eventQueue.removeFirst()
+                } ?: continue
+
+                val (type, messageId) = event
+                processMessage(type, messageId)
+            }
+        }.start()
+    }
+
+    fun enqueueEvent(type: String, messageId: String) {
+        synchronized(queueLock) {
+            eventQueue.addLast(type to messageId)
+        }
+    }
+
+
+
     private fun setupEvents() {
 
         animalSync.onMap("play") { message ->
             (message["messageId"] as? String ?: return@onMap).also {
-                processMessage("play", it)
+                enqueueEvent("play", it)
             }
         }
 
         animalSync.onMap("no_client") { message ->
             (message["messageId"] as? String ?: return@onMap).also {
-                processMessage("no_client", it)
+                enqueueEvent("no_client", it)
             }
         }
 
         animalSync.onMap("command") { message ->
             (message["messageId"] as? String ?: return@onMap).also {
-                processMessage("command", it)
+                enqueueEvent("command", it)
             }
         }
     }
@@ -60,7 +89,7 @@ object MessageHandler {
     private fun processMessage(type: String, messageId: String) {
         val future = contextFutures.computeIfAbsent(messageId) { CompletableFuture() }
 
-        future.thenAccept { context ->
+        future.orTimeout(5, TimeUnit.SECONDS).thenAccept { context ->
             when (type) {
                 "play", "command" -> runCommand(context)
                 "no_client" -> tempReply(
@@ -68,8 +97,8 @@ object MessageHandler {
                     "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
                 )
             }
-        }.orTimeout(5, TimeUnit.SECONDS).exceptionally { e ->
-            logger.warn("Không thể xử lý context: ${e.message}")
+        }.exceptionally { e ->
+            logger.warn("Không thể xử lý context cho messageId: $messageId: ${e.message}")
             null
         }
     }
