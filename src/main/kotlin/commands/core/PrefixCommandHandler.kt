@@ -52,7 +52,6 @@ object MessageHandler {
         }
     }
 
-    @Synchronized
     private fun updateContext(messageId: String, context: CommandContext) {
         contexts[messageId] = context
         contextFutures.remove(messageId)?.complete(context)
@@ -135,13 +134,14 @@ object MessageHandler {
         if (!animalSync.isConnect()) runCommand(context).also { return }
 
         val messageId = context.event.messageId
-
         updateContext(messageId, context)
 
         try {
             if (command.commandConfig.category.equals("music", ignoreCase = true)) {
+                updateContext(messageId, context)
                 handleMusicCommand(context)
             } else {
+                updateContext(messageId, context)
                 handleRegularCommand(context)
             }
         } catch (e: TimeoutCancellationException) {
