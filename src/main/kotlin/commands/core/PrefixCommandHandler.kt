@@ -35,10 +35,6 @@ object MessageHandler {
     private val eventQueue = ArrayDeque<Pair<String, String>>()
     private val queueLock = Any()
 
-    init {
-        startQueueProcessor()
-    }
-
     private fun startQueueProcessor() {
         Thread {
             while (true) {
@@ -52,7 +48,7 @@ object MessageHandler {
         }.start()
     }
 
-    fun enqueueEvent(type: String, messageId: String) {
+    private fun enqueueEvent(type: String, messageId: String) {
         synchronized(queueLock) {
             eventQueue.addLast(type to messageId)
         }
