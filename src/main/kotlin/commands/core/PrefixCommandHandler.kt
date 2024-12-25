@@ -9,7 +9,9 @@ import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import java.awt.Color
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 object MessageHandler {
     private val logger = getLogger("MessageHandler")
@@ -26,6 +28,7 @@ object MessageHandler {
         setupEvents()
     }
 
+    private val contextFutures = ConcurrentHashMap<String, CompletableFuture<CommandContext>>()
     private val contexts = ConcurrentHashMap<String, CommandContext>()
 
     private fun setupEvents() {
@@ -52,21 +55,23 @@ object MessageHandler {
     @Synchronized
     private fun updateContext(messageId: String, context: CommandContext) {
         contexts[messageId] = context
+        contextFutures.remove(messageId)?.complete(context)
     }
 
     private fun processMessage(type: String, messageId: String) {
-        val context = synchronized(contexts) {
-            contexts.remove(messageId)
-        } ?: return
+        val future = contextFutures.computeIfAbsent(messageId) { CompletableFuture() }
 
-        when (type) {
-            "play", "command" -> runCommand(context)
-            "no_client" -> {
-                tempReply(
+        future.thenAccept { context ->
+            when (type) {
+                "play", "command" -> runCommand(context)
+                "no_client" -> tempReply(
                     context.event.message,
                     "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
                 )
             }
+        }.orTimeout(5, TimeUnit.SECONDS).exceptionally { e ->
+            logger.warn("Không thể xử lý context: ${e.message}")
+            null
         }
     }
 

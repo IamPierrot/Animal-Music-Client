@@ -9,15 +9,12 @@ import dev.pierrot.service.embed
 import dev.pierrot.service.getLogger
 import dev.pierrot.service.setTimeout
 import net.dv8tion.jda.api.EmbedBuilder
-import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.entities.MessageEmbed
 import net.dv8tion.jda.api.entities.emoji.Emoji
 import net.dv8tion.jda.api.interactions.components.ActionRow
 import net.dv8tion.jda.api.interactions.components.buttons.Button
-import org.apache.batik.transcoder.TranscoderException
 import org.slf4j.Logger
 import java.awt.Color
-import java.io.IOException
 import java.util.*
 
 class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
@@ -44,18 +41,14 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
             Button.secondary("skip", Emoji.fromCustom("next", 1274012904038862879L, false))
         ).components
 
-        var msg: Message? = null
         try {
             val musicCard = getMusicCard(track.info)
-            msg = guildMusicManager.metadata?.sendFiles(musicCard)?.addActionRow(row)?.complete()
-                .also { musicCard.close() }
-        } catch (e: TranscoderException) {
-            logger.error(e.message)
-        } catch (e: IOException) {
-            logger.error(e.message)
-        }
-        msg?.let {
-            setTimeout(track.info.length) { it.delete().queue() }
+            guildMusicManager.metadata?.sendFiles(musicCard)?.addActionRow(row)?.complete()?.let { msg ->
+                setTimeout(track.info.length) { msg.delete().queue() }
+            }
+            musicCard.close()
+        } catch (e: Exception) {
+            logger.error("Error while sending music card: {}", e.message, e)
         }
     }
 
@@ -63,7 +56,10 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
         val endReason = event.endReason
 
         if (!goingBack) {
-            currentTrack?.let { history.push(it) }
+            currentTrack?.let {
+                if (history.size > 50) history.clear()
+                history.push(it)
+            }
         }
         goingBack = false
 
@@ -78,10 +74,7 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
 
     private fun handleQueueLoop(currentTrack: Track) {
         if (queue.isEmpty()) {
-            if (history.isEmpty()) {
-                startTrack(currentTrack.makeClone())
-                return
-            }
+            if (history.isEmpty()) startTrack(currentTrack.makeClone()).also { return }
 
             queue.addAll(history.reversed())
             history.clear()
@@ -89,6 +82,7 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
         nextTrack()
     }
 
+    @Synchronized
     fun enqueue(track: Track) {
         val lavalinkPlayer = guildMusicManager.getPlayer().orElse(null)
         if (lavalinkPlayer?.track == null) {
@@ -98,6 +92,7 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
         }
     }
 
+    @Synchronized
     fun enqueuePlaylist(tracks: List<Track>) {
         queue.addAll(tracks)
         if (guildMusicManager.getPlayer().isPresent) {
@@ -150,6 +145,7 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
         }
     }
 
+    @Synchronized
     private fun nextTrack() {
         val nextTrack = queue.poll()
 
