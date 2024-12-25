@@ -5,97 +5,71 @@ import dev.pierrot.listeners.AnimalSync
 import dev.pierrot.service.getLogger
 import dev.pierrot.service.tempReply
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import java.awt.Color
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 
 object MessageHandler {
     private val logger = getLogger("MessageHandler")
     private val animalSync = AnimalSync.getInstance()
 
-    fun handle(event: MessageReceivedEvent) {
-        if (event.author.isBot) return
-        val context = createMessageContext(event) ?: return
+    fun handle(event: MessageReceivedEvent) = runBlocking {
+        if (event.author.isBot) return@runBlocking
+        val context = createMessageContext(event) ?: return@runBlocking
 
         processCommand(context.command, context)
     }
 
     init {
         setupEvents()
-        startQueueProcessor()
     }
 
-    private val contextFutures = ConcurrentHashMap<String, CompletableFuture<CommandContext>>()
     private val contexts = ConcurrentHashMap<String, CommandContext>()
-
-    private val eventQueue = ArrayDeque<Pair<String, String>>()
-    private val queueLock = Any()
-
-    private fun startQueueProcessor() {
-        Thread {
-            while (true) {
-                val event = synchronized(queueLock) {
-                    if (eventQueue.isEmpty()) null else eventQueue.removeFirst()
-                } ?: continue
-
-                val (type, messageId) = event
-                processMessage(type, messageId)
-            }
-        }.start()
-    }
-
-    private fun enqueueEvent(type: String, messageId: String) {
-        synchronized(queueLock) {
-            eventQueue.addLast(type to messageId)
-        }
-    }
-
-
 
     private fun setupEvents() {
 
         animalSync.onMap("play") { message ->
             (message["messageId"] as? String ?: return@onMap).also {
-                enqueueEvent("play", it)
+                processMessage("play", it)
             }
         }
 
         animalSync.onMap("no_client") { message ->
             (message["messageId"] as? String ?: return@onMap).also {
-                enqueueEvent("no_client", it)
+                processMessage("no_client", it)
             }
         }
 
         animalSync.onMap("command") { message ->
             (message["messageId"] as? String ?: return@onMap).also {
-                enqueueEvent("command", it)
+                processMessage("command", it)
             }
         }
     }
 
+    @Synchronized
     private fun updateContext(messageId: String, context: CommandContext) {
         contexts[messageId] = context
-        contextFutures.remove(messageId)?.complete(context)
     }
 
     private fun processMessage(type: String, messageId: String) {
-        val future = contextFutures.computeIfAbsent(messageId) { CompletableFuture() }
+        val context = synchronized(contexts) {
+            contexts.remove(messageId)
+        } ?: return
 
-        future.orTimeout(5, TimeUnit.SECONDS).thenAccept { context ->
-            when (type) {
-                "play", "command" -> runCommand(context)
-                "no_client" -> tempReply(
+        when (type) {
+            "play", "command" -> runCommand(context)
+            "no_client" -> {
+                tempReply(
                     context.event.message,
                     "Hiện tại không có bot nào khả dụng để phát nhạc. Vui lòng thử lại sau."
                 )
             }
-        }.exceptionally { e ->
-            logger.warn("Không thể xử lý context cho messageId: $messageId: ${e.message}")
-            null
         }
     }
 
@@ -108,7 +82,8 @@ object MessageHandler {
         return CommandRegistry.getCommand(commandName)
     }
 
-    private fun handleMusicCommand(context: CommandContext) {
+    private fun handleMusicCommand(context: CommandContext) = runBlocking {
+        delay(100)
         animalSync.send(
             "sync_play",
             context.event.messageId,
@@ -119,7 +94,8 @@ object MessageHandler {
         )
     }
 
-    private fun handleRegularCommand(context: CommandContext) {
+    private fun handleRegularCommand(context: CommandContext) = runBlocking {
+        delay(100)
         animalSync.send(
             "command_sync",
             context.event.messageId,
@@ -154,20 +130,22 @@ object MessageHandler {
         )
     }
 
-    private fun processCommand(command: PrefixCommand, context: CommandContext) {
+    private suspend fun processCommand(command: PrefixCommand, context: CommandContext) {
         if (!validateVoiceRequirements(command, context)) return
         if (!animalSync.isConnect()) runCommand(context).also { return }
 
         val messageId = context.event.messageId
+
         updateContext(messageId, context)
 
         try {
-            if (command.commandConfig.category.equals("music", ignoreCase = true)) {
-                updateContext(messageId, context)
-                handleMusicCommand(context)
-            } else {
-                updateContext(messageId, context)
-                handleRegularCommand(context)
+            withTimeout(10_000) {
+                if (command.commandConfig.category.equals("music", ignoreCase = true)) {
+                    handleMusicCommand(context)
+                } else {
+                    handleRegularCommand(context)
+                }
+
             }
         } catch (e: TimeoutCancellationException) {
             logger.warn("Command timed out: ${context.command}")

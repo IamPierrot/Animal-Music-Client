@@ -7,6 +7,7 @@ import dev.pierrot.components.base.ComponentRegistry
 import dev.pierrot.models.PlayerEvent
 import dev.pierrot.models.PlayerSyncData
 import dev.pierrot.service.getLogger
+import kotlinx.coroutines.runBlocking
 import net.dv8tion.jda.api.entities.Activity
 import net.dv8tion.jda.api.events.guild.GuildJoinEvent
 import net.dv8tion.jda.api.events.guild.GuildLeaveEvent
@@ -104,7 +105,7 @@ class JDAListener : ListenerAdapter() {
         animalSync.send("guild_sync", animalSync.clientId.toString(), guilds)
     }
 
-    override fun onMessageReceived(event: MessageReceivedEvent) {
+    override fun onMessageReceived(event: MessageReceivedEvent) = runBlocking {
         MessageHandler.handle(event)
     }
 
