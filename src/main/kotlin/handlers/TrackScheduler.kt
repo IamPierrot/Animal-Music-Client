@@ -1,6 +1,5 @@
 package dev.pierrot.handlers
 
-import canvas.getMusicCard
 import dev.arbjerg.lavalink.client.event.TrackEndEvent
 import dev.arbjerg.lavalink.client.event.TrackStartEvent
 import dev.arbjerg.lavalink.client.player.Track
@@ -42,11 +41,10 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
         ).components
 
         try {
-            val musicCard = getMusicCard(track.info)
-            guildMusicManager.metadata?.sendFiles(musicCard)?.addActionRow(row)?.complete()?.let { msg ->
+            guildMusicManager.metadata?.sendMessageEmbeds(trackEmbed(track))?.addActionRow(row)?.complete()
+                ?.let { msg ->
                 setTimeout(track.info.length) { msg.delete().queue() }
             }
-            musicCard.close()
         } catch (e: Exception) {
             logger.error("Error while sending music card: {}", e.message, e)
         }
