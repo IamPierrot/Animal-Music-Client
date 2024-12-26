@@ -1,6 +1,5 @@
 package dev.pierrot.commands.prefix
 
-import dev.pierrot.App
 import dev.pierrot.commands.base.BasePrefixCommand
 import dev.pierrot.commands.config.CommandConfig
 import dev.pierrot.commands.core.CommandContext
@@ -26,12 +25,14 @@ class Pause : BasePrefixCommand() {
             tempReply(context.event.message, "❌ | Không có bài nào đang phát")
             return CommandResult.Success
         }
-        App.ServiceLocator.lavalinkClient.getOrCreateLink(context.event.guild.idLong)
-            .getPlayer()
-            .flatMap { it.setPaused(!it.paused) }
-            .subscribe { player ->
-                context.event.message.reply("Player has been ${if (player.paused) "paused" else "resumed"} !").queue()
-            }
+        guildMusicManager.getLink().orElse(null)?.let { link ->
+            link.getPlayer()
+                .flatMap { it.setPaused(!it.paused) }
+                .subscribe { player ->
+                    context.event.message.reply("Player has been ${if (player.paused) "paused" else "resumed"} !")
+                        .queue()
+                }
+        }
 
         return CommandResult.Success
 

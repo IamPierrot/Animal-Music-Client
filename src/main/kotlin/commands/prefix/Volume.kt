@@ -34,10 +34,11 @@ class Volume : BasePrefixCommand() {
             return CommandResult.Success
         }
 
-        val player = guildMusicManager.getPlayer().orElse(null) ?: return CommandResult.Error("Unable to find player!")
-        player.setVolume(adjustVolume.toInt())
+        val lavalink = guildMusicManager.getLink().orElse(null) ?: return CommandResult.Error("Unable to find player!")
+        lavalink.getPlayer().flatMap { it.setVolume(adjustVolume.toInt()) }.subscribe { player ->
+            context.event.message.reply("⚡ | Điều chỉnh âm thanh phát nhạc là ${player.volume}%!")
+        }
 
-        context.event.message.reply("⚡ | Điều chỉnh âm thanh phát nhạc là $adjustVolume%!")
         return CommandResult.Success
     }
 }
