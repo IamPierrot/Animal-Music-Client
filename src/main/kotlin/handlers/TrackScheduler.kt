@@ -93,11 +93,6 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
     @Synchronized
     fun enqueuePlaylist(tracks: List<Track>) {
         queue.addAll(tracks)
-        if (guildMusicManager.getPlayer().isPresent) {
-            startTrack(queue.poll())
-        } else {
-            startTrack(queue.poll())
-        }
     }
 
     @Synchronized

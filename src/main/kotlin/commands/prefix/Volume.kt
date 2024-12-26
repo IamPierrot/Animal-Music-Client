@@ -34,7 +34,8 @@ class Volume : BasePrefixCommand() {
             return CommandResult.Success
         }
 
-        guildMusicManager.getPlayer().get().setVolume(adjustVolume.toInt())
+        val player = guildMusicManager.getPlayer().orElse(null) ?: return CommandResult.Error("Unable to find player!")
+        player.setVolume(adjustVolume.toInt())
 
         context.event.message.reply("⚡ | Điều chỉnh âm thanh phát nhạc là $adjustVolume%!")
         return CommandResult.Success
