@@ -83,16 +83,14 @@ class TrackScheduler(private val guildMusicManager: GuildMusicManager) {
     @Synchronized
     fun enqueue(track: Track) {
         val lavalinkPlayer = guildMusicManager.getPlayer().orElse(null)
-        if (lavalinkPlayer?.track == null) {
-            startTrack(track)
-        } else {
-            queue.offer(track)
-        }
+        if (lavalinkPlayer?.track == null) startTrack(track) else queue.offer(track)
     }
 
     @Synchronized
     fun enqueuePlaylist(tracks: List<Track>) {
+        val lavalinkPlayer = guildMusicManager.getPlayer().orElse(null)
         queue.addAll(tracks)
+        if (lavalinkPlayer?.track == null) startTrack(queue.poll())
     }
 
     @Synchronized
