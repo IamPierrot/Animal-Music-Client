@@ -1,7 +1,7 @@
 package dev.pierrot
 
+import dev.pierrot.database.RootDatabase
 import dev.pierrot.listeners.AnimalSync
-import java.lang.RuntimeException
 
 data class Config(
     val app: AppConfig = AppConfig()
@@ -22,9 +22,10 @@ fun main() {
 
     try {
         config = Config()
-
-        AnimalSync.initialize(config.app.clientId).run {
-            App.getInstance()
+        RootDatabase.apply {
+            AnimalSync.initialize(config.app.clientId).run {
+                App.getInstance()
+            }
         }
     } catch (error: Exception) {
         System.err.println("Application failed to start: ${error.message}")

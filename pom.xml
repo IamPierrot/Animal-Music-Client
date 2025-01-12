@@ -20,6 +20,7 @@
         <junit.version>5.10.0</junit.version>
         <lavalink.version>3.1.0</lavalink.version>
         <jda.version>5.2.1</jda.version>
+        <ktorm.version>4.1.1</ktorm.version>
     </properties>
 
     <repositories>
@@ -208,6 +209,13 @@
                     <artifactId>activation</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+
+        <!-- Database -->
+        <dependency>
+            <groupId>org.ktorm</groupId>
+            <artifactId>ktorm-core</artifactId>
+            <version>${ktorm.version}</version>
         </dependency>
     </dependencies>
 
