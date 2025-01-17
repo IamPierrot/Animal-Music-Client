@@ -1,5 +1,6 @@
 package dev.pierrot.database
 
+import dev.pierrot.config
 import dev.pierrot.service.getLogger
 import org.ktorm.database.Database
 import java.sql.Connection
@@ -8,6 +9,7 @@ import kotlin.system.exitProcess
 
 object RootDatabase {
     private var _db: Database? = null
+    private val logger = getLogger("database")
 
     var db: Database
         get() {
@@ -18,22 +20,29 @@ object RootDatabase {
             _db = value
         }
 
-    private val DATABASE_URL = System.getenv("DATABASE_URL")
-        ?: throw IllegalArgumentException("DATABASE_URL is not set")
-    private val logger = getLogger("Database")
-
     init {
         connectDatabase()
     }
 
+    private val DATABASE_USER = config.appEnv.databaseUsername
+    private val DATABASE_PASSWORD = config.appEnv.databasePassword
+
     private fun connectDatabase() {
         try {
-            db = Database.connect(DATABASE_URL)
-            logger.info("Database connected successfully.")
+            db = Database.connect(
+                url = resolveDatabaseUrl(),
+                driver = "org.${config.appEnv.databaseType}.Driver",
+                user = DATABASE_USER,
+                password = DATABASE_PASSWORD
+            )
         } catch (ex: Exception) {
             logger.error("Failed to connect to the database: ${ex.message}", ex)
             exitProcess(1)
         }
+    }
+
+    private fun resolveDatabaseUrl(): String {
+        return "jdbc:${config.appEnv.databaseType}://${config.appEnv.databaseHost}:${config.appEnv.databasePort}/${config.appEnv.databaseName}"
     }
 
     private fun isDatabaseAvailable(): Boolean {
