@@ -26,14 +26,13 @@ data class Config(
     )
 }
 
-lateinit var config: Config
+val config: Config = Config()
 
 fun main() {
 
     Runtime.getRuntime().addShutdownHook(thread(start = false, block = RootDatabase::disconnectDatabase))
 
     try {
-        config = Config()
         RootDatabase.apply {
             AnimalSync.initialize(config.app.clientId).run {
                 App.getInstance()
