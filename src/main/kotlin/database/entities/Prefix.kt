@@ -6,6 +6,5 @@ interface Prefix : Entity<Prefix> {
     companion object : Entity.Factory<Prefix>()
 
     val guildId: String
-    val prefixName: String
-    val guild: Guild
+    val prefix: String
 }

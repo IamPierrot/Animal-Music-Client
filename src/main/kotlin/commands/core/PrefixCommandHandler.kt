@@ -1,6 +1,9 @@
 package dev.pierrot.commands.core
 
 import dev.pierrot.config
+import dev.pierrot.database.RootDatabase.db
+import dev.pierrot.database.schemas.Guilds
+import dev.pierrot.database.schemas.Prefixes
 import dev.pierrot.listeners.AnimalSync
 import dev.pierrot.service.getLogger
 import dev.pierrot.service.tempReply
@@ -11,6 +14,10 @@ import kotlinx.coroutines.withTimeout
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
+import org.ktorm.dsl.eq
+import org.ktorm.entity.find
+import org.ktorm.entity.sequenceOf
+import org.ktorm.support.postgresql.insertOrUpdate
 import java.awt.Color
 import java.util.concurrent.ConcurrentHashMap
 
@@ -21,6 +28,17 @@ object MessageHandler {
     fun handle(event: MessageReceivedEvent) = runBlocking {
         if (event.author.isBot) return@runBlocking
         val context = createMessageContext(event) ?: return@runBlocking
+
+        db.insertOrUpdate(Guilds) {
+            set(it.guildName, event.guild.name)
+            set(it.guildId, event.guild.id)
+            set(it.guildOwnerId, event.guild.owner?.id)
+
+            onConflict {
+                set(it.guildName, event.guild.name)
+                set(it.guildOwnerId, event.guild.owner?.id)
+            }
+        }
 
         processCommand(context.command, context)
     }
@@ -108,27 +126,31 @@ object MessageHandler {
     private fun createMessageContext(event: MessageReceivedEvent): CommandContext? {
         val (prefix, isMentionPrefix) = determinePrefix(event)
         val content = event.message.contentRaw
-        if (!content.startsWith(prefix, ignoreCase = true)) return null
+
+        if (prefix == null) return null
 
         val withoutPrefix = content.substring(prefix.length).trim()
-        val args = withoutPrefix.split("\\s+".toRegex())
-        if (args.isEmpty()) return null
-        val commandName = args[0].lowercase()
+        if (withoutPrefix.isEmpty()) return null
 
+        val args = withoutPrefix.split("\\s+".toRegex())
+        val commandName = args[0].lowercase()
         val command = findCommand(commandName) ?: run {
             handleUnknownCommand(event, isMentionPrefix)
             return null
         }
+
+        val rawArgs = if (args.size > 1) args[1].trim() else ""
 
         return CommandContext(
             event = event,
             prefix = prefix,
             isMentionPrefix = isMentionPrefix,
             command = command,
-            args = args.drop(1),
-            rawArgs = withoutPrefix.substringAfter(args[0]).trim()
+            args = if (args.size > 1) args[1].split("\\s+".toRegex()) else emptyList(),
+            rawArgs = rawArgs
         )
     }
+
 
     private suspend fun processCommand(command: PrefixCommand, context: CommandContext) {
         if (!validateVoiceRequirements(command, context)) return
@@ -145,7 +167,6 @@ object MessageHandler {
                 } else {
                     handleRegularCommand(context)
                 }
-
             }
         } catch (e: TimeoutCancellationException) {
             logger.warn("Command timed out: ${context.command}")
@@ -169,10 +190,23 @@ object MessageHandler {
         }
     }
 
-    private fun determinePrefix(event: MessageReceivedEvent): Pair<String, Boolean> {
+    private fun determinePrefix(event: MessageReceivedEvent): Pair<String?, Boolean> {
         val mention = event.message.mentions.users.firstOrNull { it.id == event.jda.selfUser.id }
-        return if (mention != null) mention.asMention to true else config.app.prefix to false
+        if (mention != null) {
+            return mention.asMention to true
+        }
+
+        val guildId = event.guild.id
+        val prefixInDatabase = db.sequenceOf(Prefixes, withReferences = false)
+            .find { it.guildId eq guildId }?.prefix
+
+        val content = event.message.contentRaw
+        return if (prefixInDatabase != null && content.startsWith(prefixInDatabase, ignoreCase = true)) {
+            prefixInDatabase to false
+        } else if (content.startsWith(config.app.prefix, ignoreCase = true)) config.app.prefix to false
+        else null to false
     }
+
 
     private fun handleUnknownCommand(event: MessageReceivedEvent, isMentionPrefix: Boolean) {
         if (isMentionPrefix) {

@@ -7,5 +7,5 @@ interface Guild : Entity<Guild> {
 
     val guildId: String
     val guildName: String
-    val guildOwnerId: String
+    val guildOwnerId: String?
 }
