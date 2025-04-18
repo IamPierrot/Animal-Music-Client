@@ -28,6 +28,9 @@ object RootDatabase {
     private val DATABASE_PASSWORD = config.appEnv.databasePassword
 
     private fun connectDatabase() {
+        logger.info(DATABASE_USER)
+        logger.info(DATABASE_PASSWORD)
+        logger.info(resolveDatabaseUrl())
         try {
             db = Database.connect(
                 url = resolveDatabaseUrl(),
