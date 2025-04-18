@@ -38,7 +38,7 @@ object MessageHandler {
                 set(it.guildName, event.guild.name)
                 set(it.guildOwnerId, event.guild.owner?.id)
             }
-        }
+        }.runCatching { logger.error("Can not update or create guild"); return@runCatching }
 
         processCommand(context.command, context)
     }
@@ -124,30 +124,40 @@ object MessageHandler {
     }
 
     private fun createMessageContext(event: MessageReceivedEvent): CommandContext? {
+
         val (prefix, isMentionPrefix) = determinePrefix(event)
-        val content = event.message.contentRaw
 
         if (prefix == null) return null
 
-        val withoutPrefix = content.substring(prefix.length).trim()
-        if (withoutPrefix.isEmpty()) return null
-
-        val args = withoutPrefix.split("\\s+".toRegex())
-        val commandName = args[0].lowercase()
-        val command = findCommand(commandName) ?: run {
+        fun abort(): CommandContext? {
             handleUnknownCommand(event, isMentionPrefix)
             return null
         }
 
-        val rawArgs = if (args.size > 1) args[1].trim() else ""
+        val contentRaw = event.message.contentRaw
+
+        val withoutPrefix = contentRaw.removePrefix(prefix).trimStart()
+        if (withoutPrefix.isEmpty()) return abort()
+
+        val (commandPart, rawArgs) = withoutPrefix
+            .split("\\s+".toRegex(), limit = 2)
+            .let { it[0] to it.getOrNull(1).orEmpty() }
+
+        val commandName = commandPart.lowercase()
+        val command = findCommand(commandName) ?: run { return abort() }
+
+        val args = rawArgs
+            .takeIf { it.isNotBlank() }
+            ?.split("\\s+".toRegex())
+            ?: emptyList()
 
         return CommandContext(
             event = event,
             prefix = prefix,
             isMentionPrefix = isMentionPrefix,
             command = command,
-            args = if (args.size > 1) args[1].split("\\s+".toRegex()) else emptyList(),
-            rawArgs = rawArgs
+            args = args,
+            rawArgs = rawArgs.trim()
         )
     }
 
@@ -214,7 +224,6 @@ object MessageHandler {
 
         return null to false
     }
-
 
 
     private fun handleUnknownCommand(event: MessageReceivedEvent, isMentionPrefix: Boolean) {
