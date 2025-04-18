@@ -136,7 +136,7 @@ class App private constructor() {
         val node = LavalinkNodeBuilder()
             .setName("localhost")
             .setServerUri(config.app.lavaLinkUrl)
-            .setPassword("youshallnotpass")
+            .setPassword("LVLYubabe")
             .build()
 
         ServiceLocator.lavalinkClient.addNode(node)
