@@ -21,8 +21,8 @@ data class Config(
         val databaseHost: String = System.getenv("DATABASE_HOST") ?: "localhost",
         val databasePort: String = System.getenv("DATABASE_PORT") ?: "5432",
         val databaseName: String = System.getenv("DATABASE_NAME") ?: "postgres",
-        val databaseUsername: String = System.getenv("DATABASE_USERNAME") ?: "postgres",
-        val databasePassword: String = System.getenv("DATABASE_PASSWORD") ?: "postgres",
+        val databaseUsername: String = System.getenv("DATABASE_USERNAME") ?: "vet",
+        val databasePassword: String = System.getenv("DATABASE_PASSWORD") ?: "catdog123",
     )
 }
 
