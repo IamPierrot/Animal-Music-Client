@@ -5,7 +5,7 @@ import org.ktorm.schema.Table
 import org.ktorm.schema.text
 import org.ktorm.schema.varchar
 
-object Prefixes : Table<Prefix>("Prefix") {
+object Prefixes : Table<Prefix>("prefix") {
     val guildId = text("guild_id").primaryKey().bindTo { it.guildId }
     val prefix = varchar("prefix").bindTo { it.prefix }
 }
