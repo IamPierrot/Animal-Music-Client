@@ -197,7 +197,7 @@ object MessageHandler {
         }
 
         val guildId = event.guild.id
-        val prefixInDatabase = db.sequenceOf(Prefixes, withReferences = false)
+        val prefixInDatabase = db.sequenceOf(Prefixes)
             .find { it.guildId eq guildId }?.prefix
 
         val content = event.message.contentRaw
