@@ -24,19 +24,14 @@ object RootDatabase {
         connectDatabase()
     }
 
-    private val DATABASE_USER = config.appEnv.databaseUsername
-    private val DATABASE_PASSWORD = config.appEnv.databasePassword
-
     private fun connectDatabase() {
-        logger.info(DATABASE_USER)
-        logger.info(DATABASE_PASSWORD)
         logger.info(resolveDatabaseUrl())
         try {
             db = Database.connect(
                 url = resolveDatabaseUrl(),
                 driver = "org.${config.appEnv.databaseType}.Driver",
-                user = DATABASE_USER,
-                password = DATABASE_PASSWORD
+                user = config.appEnv.databaseUsername,
+                password = config.appEnv.databasePassword
             )
         } catch (ex: Exception) {
             logger.error("Failed to connect to the database: ${ex.message}", ex)
