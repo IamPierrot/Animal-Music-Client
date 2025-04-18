@@ -40,7 +40,7 @@ class Play : BasePrefixCommand() {
             }
 
             val identifier = context.args.joinToString(" ")
-            val query = if (identifier.startsWith("https")) identifier else "ytsearch:$identifier"
+            val query = if (identifier.startsWith("https")) identifier else "ytmsearch:$identifier"
 
             val link = App.ServiceLocator.lavalinkClient.getOrCreateLink(guildId.toLong())
             val guildMusicManager = getOrCreateMusicManager(guildId, context.event.channel)
