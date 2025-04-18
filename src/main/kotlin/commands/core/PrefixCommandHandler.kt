@@ -191,21 +191,30 @@ object MessageHandler {
     }
 
     private fun determinePrefix(event: MessageReceivedEvent): Pair<String?, Boolean> {
-        val mention = event.message.mentions.users.firstOrNull { it.id == event.jda.selfUser.id }
-        if (mention != null) {
-            return mention.asMention to true
+        val content = event.message.contentRaw
+        val botMention = event.jda.selfUser.asMention
+
+        if (content.startsWith(botMention, ignoreCase = true)) {
+            return botMention to true
         }
 
         val guildId = event.guild.id
-        val prefixInDatabase = db.sequenceOf(Prefixes)
-            .find { it.guildId eq guildId }?.prefix
+        val dbPrefix = db.sequenceOf(Prefixes)
+            .find { it.guildId eq guildId }
+            ?.prefix
 
-        val content = event.message.contentRaw
-        return if (prefixInDatabase != null && content.startsWith(prefixInDatabase, ignoreCase = true)) {
-            prefixInDatabase to false
-        } else if (content.startsWith(config.app.prefix, ignoreCase = true)) config.app.prefix to false
-        else null to false
+        if (dbPrefix != null && content.startsWith(dbPrefix, ignoreCase = true)) {
+            return dbPrefix to false
+        }
+
+        val defaultPrefix = config.app.prefix
+        if (content.startsWith(defaultPrefix, ignoreCase = true)) {
+            return defaultPrefix to false
+        }
+
+        return null to false
     }
+
 
 
     private fun handleUnknownCommand(event: MessageReceivedEvent, isMentionPrefix: Boolean) {
