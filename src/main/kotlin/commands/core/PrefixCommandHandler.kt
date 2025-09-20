@@ -29,17 +29,6 @@ object MessageHandler {
         if (event.author.isBot) return@runBlocking
         val context = createMessageContext(event) ?: return@runBlocking
 
-        db.insertOrUpdate(Guilds) {
-            set(it.guildName, event.guild.name)
-            set(it.guildId, event.guild.id)
-            set(it.guildOwnerId, event.guild.owner?.id)
-
-            onConflict {
-                set(it.guildName, event.guild.name)
-                set(it.guildOwnerId, event.guild.owner?.id)
-            }
-        }.runCatching { logger.error("Can not update or create guild"); return@runCatching }
-
         processCommand(context.command, context)
     }
 
