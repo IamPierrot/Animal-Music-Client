@@ -209,13 +209,17 @@ object MessageHandler {
         }
 
         val guildId = event.guild.id
-        val dbPrefix = db.sequenceOf(Prefixes)
-            .find { it.guildId eq guildId }
-            ?.prefix
 
-        if (dbPrefix != null && content.startsWith(dbPrefix, ignoreCase = true)) {
-            return dbPrefix to false
-        }
+        try {
+            val dbPrefix = db.sequenceOf(Prefixes)
+                .find { it.guildId eq guildId }
+                ?.prefix
+
+            if (dbPrefix != null && content.startsWith(dbPrefix, ignoreCase = true)) {
+                return dbPrefix to false
+            }
+        } catch (e: Exception) {}
+
 
         val defaultPrefix = config.app.prefix
         if (content.startsWith(defaultPrefix, ignoreCase = true)) {
